@@ -1,0 +1,152 @@
+
+Action: file_editor create /app/frontend/src/index.css --file-text "@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0B0F19;
+  --surface: #131A2A;
+  --surface-2: #1A233A;
+  --surface-3: #1E293B;
+  --border: #1E293B;
+  --border-strong: #334155;
+  --text-1: #FFFFFF;
+  --text-2: #94A3B8;
+  --text-3: #64748B;
+  --brand: #007AFF;
+  --brand-hover: #0056B3;
+  --accent: #F59E0B;
+  --up: #10B981;
+  --down: #EF4444;
+}
+
+* { border-color: var(--border); }
+
+html, body, #root { background: var(--bg); color: var(--text-1); min-height: 100vh; }
+
+body {
+  margin: 0;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: \"ss01\", \"cv11\";
+}
+
+.font-display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+
+.glass-nav {
+  background: rgba(11, 15, 25, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.card-flat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: border-color .2s ease, transform .2s ease;
+}
+.card-flat:hover { border-color: var(--border-strong); }
+
+.btn-primary {
+  background: var(--brand);
+  color: white;
+  border-radius: 4px;
+  padding: 10px 22px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background .15s ease;
+}
+.btn-primary:hover { background: var(--brand-hover); }
+.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-1);
+  border-radius: 4px;
+  padding: 10px 22px;
+  transition: background .15s ease;
+}
+.btn-ghost:hover { background: var(--surface-2); }
+
+.text-up { color: var(--up); }
+.text-down { color: var(--down); }
+.bg-up-soft { background: rgba(16, 185, 129, 0.1); }
+.bg-down-soft { background: rgba(239, 68, 68, 0.1); }
+
+.label-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.input-dark {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 12px 14px;
+  color: white;
+  width: 100%;
+  outline: none;
+  transition: border-color .15s;
+}
+.input-dark:focus { border-color: var(--brand); }
+.input-dark::placeholder { color: var(--text-3); }
+
+.price-flash-up { animation: flashUp 1s ease-out; }
+.price-flash-down { animation: flashDown 1s ease-out; }
+@keyframes flashUp {
+  0% { background-color: rgba(16,185,129,0.25); }
+  100% { background-color: transparent; }
+}
+@keyframes flashDown {
+  0% { background-color: rgba(239,68,68,0.25); }
+  100% { background-color: transparent; }
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.divider-row { border-bottom: 1px solid var(--border); }
+
+@layer base {
+  :root {
+    --background: 222 47% 7%;
+    --foreground: 0 0% 100%;
+    --card: 222 38% 12%;
+    --card-foreground: 0 0% 100%;
+    --popover: 222 38% 12%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 211 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 211 100% 50%;
+    --radius: 0.25rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+}
+"
+Observation: Overwrite successful: /app/frontend/src/index.css
