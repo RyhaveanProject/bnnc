@@ -1,186 +1,157 @@
 
-Action: file_editor create /app/frontend/src/pages/Deposit.jsx --file-text "import React, { useEffect, useState } from \"react\";
-import { api, fmt } from \"@/lib/api\";
-import { toast } from \"sonner\";
-import { Copy, Check, Wallet } from \"lucide-react\";
+Action: file_editor create /app/frontend/src/pages/Deposit.jsx --file-text "import React, { useEffect, useMemo, useState } from \"react\";
 import { QRCodeSVG } from \"qrcode.react\";
-
-const COINS = [
-  { code: \"USDT\", name: \"Tether\", network: \"TRC20\" },
-  { code: \"BTC\", name: \"Bitcoin\", network: \"Bitcoin\" },
-  { code: \"ETH\", name: \"Ethereum\", network: \"ERC20\" },
-  { code: \"TRX\", name: \"TRON\", network: \"TRC20\" },
-  { code: \"BNB\", name: \"BNB\", network: \"BEP20\" },
-];
+import api, { SUPPORTED_CRYPTOS, fmtMoney } from \"../lib/api\";
+import { formatErr } from \"../lib/auth\";
 
 export default function Deposit() {
-  const [selected, setSelected] = useState(\"USDT\");
-  const [wallet, setWallet] = useState(null);
+  const [wallets, setWallets] = useState([]);
+  const [currency, setCurrency] = useState(\"USDT\");
   const [amount, setAmount] = useState(\"\");
-  const [txHash, setTxHash] = useState(\"\");
-  const [submitting, setSubmitting] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [deposit, setDeposit] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [receipt, setReceipt] = useState(null); // base64
+  const [err, setErr] = useState(\"\");
+  const [msg, setMsg] = useState(\"\");
+  const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState([]);
 
-  useEffect(() => {
-    api.wallet(selected).then(setWallet).catch(() => setWallet(null));
-  }, [selected]);
+  const loadWallets = async () => {
+    const { data } = await api.get(\"/wallets\");
+    setWallets(data);
+  };
+  const loadHistory = async () => {
+    const { data } = await api.get(\"/deposits/me\");
+    setHistory(data);
+  };
+  useEffect(() => { loadWallets(); loadHistory(); }, []);
 
-  useEffect(() => {
-    api.depositHistory().then(d => setHistory(d.items || [])).catch(() => {});
-  }, []);
+  const wallet = useMemo(() => wallets.find(w => w.currency === currency), [wallets, currency]);
 
-  const copy = async () => {
-    if (!wallet?.address) return;
-    await navigator.clipboard.writeText(wallet.address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-    toast.success(\"Address copied\");
+  const onCreate = async (e) => {
+    e.preventDefault();
+    setErr(\"\"); setMsg(\"\"); setBusy(true);
+    try {
+      const { data } = await api.post(\"/deposits/create\", { currency, amount: parseFloat(amount) });
+      setDeposit(data.deposit);
+    } catch (e2) { setErr(formatErr(e2)); }
+    finally { setBusy(false); }
   };
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!amount || Number(amount) <= 0) return toast.error(\"Enter a valid amount\");
-    setSubmitting(true);
+  const copy = () => {
+    if (!wallet?.address) return;
+    navigator.clipboard.writeText(wallet.address);
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
+
+  const onReceipt = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => setReceipt(reader.result);
+    reader.readAsDataURL(f);
+  };
+
+  const onConfirm = async () => {
+    if (!deposit || !receipt) { setErr(\"Please upload receipt image\"); return; }
+    setErr(\"\"); setMsg(\"\"); setBusy(true);
     try {
-      await api.createDeposit({ currency: selected, amount: Number(amount), tx_hash: txHash });
-      toast.success(\"Deposit submitted. Awaiting confirmation.\");
-      setAmount(\"\"); setTxHash(\"\");
-      const d = await api.depositHistory();
-      setHistory(d.items || []);
-    } catch (err) {
-      toast.error(err.response?.data?.detail || \"Failed to submit\");
-    } finally { setSubmitting(false); }
+      await api.post(\"/deposits/confirm\", { deposit_id: deposit.id, receipt_b64: receipt });
+      setMsg(\"Receipt submitted. Pending admin approval.\");
+      setDeposit(null); setReceipt(null); setAmount(\"\");
+      await loadHistory();
+    } catch (e2) { setErr(formatErr(e2)); }
+    finally { setBusy(false); }
   };
 
   return (
-    <div className=\"max-w-[1440px] mx-auto px-6 sm:px-8 py-8 lg:py-10\">
-      <div className=\"mb-6\">
-        <div className=\"label-eyebrow mb-1\">Funds</div>
-        <h1 className=\"font-display text-3xl font-semibold flex items-center gap-2\">
-          <Wallet className=\"w-6 h-6 text-[#007AFF]\" /> Deposit crypto
-        </h1>
-      </div>
-
-      <div className=\"grid lg:grid-cols-12 gap-6\">
-        {/* Step 1: select coin */}
-        <div className=\"lg:col-span-4 card-flat p-6\">
-          <div className=\"label-eyebrow mb-4\">1 · Select asset</div>
-          <div className=\"space-y-2\">
-            {COINS.map((c) => (
-              <button key={c.code} onClick={() => setSelected(c.code)} data-testid={`coin-${c.code}`}
-                className={`w-full text-left px-4 py-3 rounded-sm border transition-colors flex items-center justify-between ${
-                  selected === c.code ? \"border-[#007AFF] bg-[#1A233A]\" : \"border-[#1E293B] hover:bg-[#1A233A]\"
-                }`}>
-                <div>
-                  <div className=\"font-medium text-sm\">{c.code}</div>
-                  <div className=\"text-xs text-slate-500\">{c.name}</div>
-                </div>
-                <span className=\"text-xs font-mono text-slate-400\">{c.network}</span>
-              </button>
+    <div data-testid=\"deposit-page\" style={{maxWidth:1100, margin:\"0 auto\", padding:24}} className=\"container-pad\">
+      <h1 style={{margin:\"0 0 24px\"}}>Deposit</h1>
+      <div style={{display:\"grid\", gridTemplateColumns:\"1fr 1fr\", gap:20}} className=\"dep-grid\">
+        <div className=\"panel\" style={{padding:24}}>
+          <div className=\"lbl\">Select Coin</div>
+          <div style={{display:\"flex\", gap:8, flexWrap:\"wrap\", marginBottom:16}}>
+            {SUPPORTED_CRYPTOS.map(c => (
+              <button key={c} onClick={() => { setCurrency(c); setDeposit(null); }} data-testid={`dep-coin-${c}`}
+                className={`btn btn-sm ${currency===c?\"btn-primary\":\"btn-ghost\"}`}>{c}</button>
             ))}
           </div>
-        </div>
 
-        {/* Step 2: wallet address */}
-        <div className=\"lg:col-span-4 card-flat p-6\">
-          <div className=\"label-eyebrow mb-4\">2 · Send to address</div>
-          {wallet ? (
-            <>
-              <div className=\"flex justify-center my-4 bg-white p-3 rounded-sm\" data-testid=\"deposit-qr\">
-                <QRCodeSVG value={wallet.address} size={148} bgColor=\"#FFFFFF\" fgColor=\"#0B0F19\" />
+          {!deposit ? (
+            <form onSubmit={onCreate}>
+              <label className=\"lbl\">Amount ({currency})</label>
+              <input className=\"input\" type=\"number\" step=\"any\" min=\"0\" value={amount} onChange={e=>setAmount(e.target.value)} required data-testid=\"dep-amount\"/>
+              <div style={{height:14}}/>
+              <label className=\"lbl\">Wallet Address ({wallet?.network || currency})</label>
+              <div style={{display:\"flex\", gap:8}}>
+                <input className=\"input\" value={wallet?.address || \"\"} readOnly data-testid=\"dep-wallet\"/>
+                <button type=\"button\" className=\"btn btn-ghost btn-sm\" onClick={copy} data-testid=\"dep-copy\">{copied?\"Copied\":\"Copy\"}</button>
               </div>
-              <div className=\"label-eyebrow mb-2\">Network</div>
-              <div className=\"font-mono text-sm mb-4 text-slate-300\">{wallet.network}</div>
-              <div className=\"label-eyebrow mb-2\">Wallet address</div>
-              <div className=\"relative\">
-                <div className=\"font-mono text-xs bg-[#0B0F19] border border-[#1E293B] p-3 pr-12 break-all rounded-sm\" data-testid=\"deposit-address\">
-                  {wallet.address}
-                </div>
-                <button onClick={copy} className=\"absolute top-2 right-2 p-2 hover:bg-[#1A233A] rounded-sm\" data-testid=\"copy-address-btn\">
-                  {copied ? <Check className=\"w-4 h-4 text-up\" /> : <Copy className=\"w-4 h-4 text-slate-400\" />}
+              <div style={{marginTop:18, display:\"flex\", justifyContent:\"center\"}}>
+                {wallet?.qr_image_b64 ? (
+                  <img src={wallet.qr_image_b64} alt=\"qr\" style={{width:180, height:180, background:\"#fff\", padding:6, borderRadius:8}} data-testid=\"dep-qr-img\"/>
+                ) : wallet?.address ? (
+                  <div style={{background:\"#fff\", padding:10, borderRadius:8}} data-testid=\"dep-qr-gen\">
+                    <QRCodeSVG value={wallet.address} size={180}/>
+                  </div>
+                ) : <div className=\"text-dim\">Wallet not configured</div>}
+              </div>
+              {err && <div className=\"text-red\" style={{marginTop:12, fontSize:13}} data-testid=\"dep-err\">{err}</div>}
+              <button type=\"submit\" className=\"btn btn-primary\" style={{marginTop:18, width:\"100%\"}} disabled={busy} data-testid=\"dep-create\">
+                {busy ? <span className=\"spinner\"/> : \"I've Paid — Continue\"}
+              </button>
+            </form>
+          ) : (
+            <div>
+              <div className=\"text-dim\" style={{fontSize:13, marginBottom:8}}>Deposit reference</div>
+              <div style={{fontSize:13, marginBottom:14}}><code>{deposit.id}</code></div>
+              <div style={{fontSize:14, marginBottom:6}}>{deposit.amount} {deposit.currency}</div>
+              <label className=\"lbl\">Upload payment receipt (image)</label>
+              <input type=\"file\" accept=\"image/*\" onChange={onReceipt} data-testid=\"dep-receipt-file\" />
+              {receipt && <img src={receipt} alt=\"receipt\" style={{maxWidth:\"100%\", marginTop:10, borderRadius:8}} />}
+              {err && <div className=\"text-red\" style={{marginTop:10, fontSize:13}}>{err}</div>}
+              {msg && <div className=\"text-green\" style={{marginTop:10, fontSize:13}}>{msg}</div>}
+              <div style={{display:\"flex\", gap:10, marginTop:14}}>
+                <button className=\"btn btn-ghost\" onClick={() => { setDeposit(null); setReceipt(null); }}>Cancel</button>
+                <button className=\"btn btn-primary\" onClick={onConfirm} disabled={busy || !receipt} data-testid=\"dep-confirm\">
+                  {busy ? <span className=\"spinner\"/> : \"Submit Receipt\"}
                 </button>
               </div>
-              <p className=\"mt-4 text-xs text-slate-500 leading-relaxed\">
-                Only send {selected} on the {wallet.network} network to this address. Sending other assets or wrong network may result in permanent loss.
-              </p>
-            </>
-          ) : (
-            <div className=\"text-sm text-slate-500\">Loading…</div>
+            </div>
           )}
+          {msg && !deposit && <div className=\"text-green\" style={{marginTop:10, fontSize:13}} data-testid=\"dep-msg\">{msg}</div>}
         </div>
 
-        {/* Step 3: confirm */}
-        <div className=\"lg:col-span-4 card-flat p-6\">
-          <div className=\"label-eyebrow mb-4\">3 · Confirm deposit</div>
-          <form onSubmit={submit} className=\"space-y-4\">
-            <div>
-              <label className=\"label-eyebrow block mb-2\">Amount ({selected})</label>
-              <input type=\"number\" step=\"any\" value={amount} onChange={e => setAmount(e.target.value)} className=\"input-dark font-mono\" placeholder=\"0.00\" data-testid=\"deposit-amount\" />
-            </div>
-            <div>
-              <label className=\"label-eyebrow block mb-2\">Transaction hash (optional)</label>
-              <input type=\"text\" value={txHash} onChange={e => setTxHash(e.target.value)} className=\"input-dark font-mono\" placeholder=\"0x…\" data-testid=\"deposit-txhash\" />
-            </div>
-            <button disabled={submitting} className=\"btn-primary w-full\" data-testid=\"deposit-submit\">
-              {submitting ? \"Submitting…\" : \"Submit deposit\"}
-            </button>
-            <p className=\"text-xs text-slate-500 leading-relaxed\">
-              Notification is sent to operations. Funds are credited after on-chain confirmations.
-            </p>
-          </form>
-        </div>
-      </div>
-
-      {/* History */}
-      <div className=\"mt-10\">
-        <div className=\"label-eyebrow mb-3\">Recent deposits</div>
-        <div className=\"card-flat overflow-x-auto\">
-          <table className=\"w-full text-sm\" data-testid=\"deposit-history-table\">
-            <thead>
-              <tr className=\"text-slate-500 text-xs uppercase tracking-wider\">
-                <th className=\"text-left p-4 font-medium\">Date</th>
-                <th className=\"text-left p-4 font-medium\">Asset</th>
-                <th className=\"text-right p-4 font-medium\">Amount</th>
-                <th className=\"text-left p-4 font-medium\">Network</th>
-                <th className=\"text-left p-4 font-medium\">Tx</th>
-                <th className=\"text-right p-4 font-medium\">Status</th>
-              </tr>
-            </thead>
+        <div className=\"panel\" style={{padding:24}}>
+          <div style={{fontWeight:600, marginBottom:12}}>Recent Deposits</div>
+          <div style={{overflowX:\"auto\"}}>
+          <table className=\"tbl\">
+            <thead><tr><th>Time</th><th>Amount</th><th>Address</th><th>Status</th></tr></thead>
             <tbody>
-              {history.length === 0 ? (
-                <tr><td colSpan=\"6\" className=\"p-8 text-center text-slate-500 text-sm\">No deposits yet</td></tr>
-              ) : history.map((h) => (
-                <tr key={h.id} className=\"border-t border-[#1E293B] hover:bg-[#1A233A]\">
-                  <td className=\"p-4 text-slate-400 font-mono text-xs\">{h.created_at?.slice(0, 19).replace(\"T\", \" \")}</td>
-                  <td className=\"p-4 font-medium\">{h.currency}</td>
-                  <td className=\"p-4 text-right font-mono\">{h.amount}</td>
-                  <td className=\"p-4 font-mono text-slate-400\">{h.network}</td>
-                  <td className=\"p-4 font-mono text-xs text-slate-500 truncate max-w-[200px]\">{h.tx_hash || \"—\"}</td>
-                  <td className=\"p-4 text-right\">
-                    <StatusBadge status={h.status} />
-                  </td>
+              {history.length === 0 && <tr><td colSpan={4} className=\"text-dim\">No deposits yet</td></tr>}
+              {history.map(h => (
+                <tr key={h.id} data-testid={`dep-row-${h.id}`}>
+                  <td style={{fontSize:12}}>{new Date(h.created_at).toLocaleString()}</td>
+                  <td>{h.amount} {h.currency}</td>
+                  <td style={{fontSize:11, maxWidth:120, overflow:\"hidden\", textOverflow:\"ellipsis\"}}>{h.wallet_address}</td>
+                  <td><StatusPill s={h.status}/></td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
+      <style>{`@media (max-width: 900px) { .dep-grid { grid-template-columns: 1fr !important; } }`}</style>
     </div>
   );
 }
 
-function StatusBadge({ status }) {
-  const map = {
-    pending: \"bg-[#1A233A] text-[#F59E0B] border-[#F59E0B]/30\",
-    approved: \"bg-up-soft text-up border-[#10B981]/30\",
-    rejected: \"bg-down-soft text-down border-[#EF4444]/30\",
-  };
-  return (
-    <span className={`text-xs uppercase tracking-wider font-medium px-2.5 py-1 border rounded-sm ${map[status] || \"\"}`}>
-      {status}
-    </span>
-  );
+function StatusPill({ s }) {
+  if (s === \"pending\") return <span className=\"pill pending\">⏱ Pending</span>;
+  if (s === \"approved\") return <span className=\"pill approved\">✓ Deposit confirmed</span>;
+  if (s === \"rejected\") return <span className=\"pill rejected\">✕ Rejected</span>;
+  return <span className=\"pill\">{s}</span>;
 }
 "
-Observation: Create successful: /app/frontend/src/pages/
+Observation: Create successful: /app/frontend/src/pages/Deposit.jsx
