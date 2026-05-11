@@ -1,0 +1,17 @@
+{
+  "short_name": "ADX America",
+  "name": "ADX America — Professional Crypto Trading Platform",
+  "description": "Secure, fast and professional cryptocurrency trading platform.",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0B0F19",
+  "background_color": "#0B0F19"
+}
