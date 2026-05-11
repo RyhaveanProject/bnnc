@@ -21,6 +21,22 @@ export default function Trade() {
   const usdtBal = user?.balances?.USDT || 0;
   const coinBal = user?.balances?.[symbol] || 0;
 
+  // Live portfolio total in USD. Re-computes whenever market prices tick.
+  const portfolio = useMemo(() => {
+    if (!user?.balances || !data?.length) return { total: 0, rows: [] };
+    let total = 0;
+    const rows = [];
+    for (const c of Object.keys(user.balances)) {
+      const qty = Number(user.balances[c] || 0);
+      if (qty <= 0) continue;
+      const p = c === "USDT" ? 1 : (data.find(d => d.symbol === c)?.price || 0);
+      const usd = qty * p;
+      total += usd;
+      rows.push({ sym: c, qty, price: p, usd });
+    }
+    return { total, rows };
+  }, [user, data]);
+
   const onSym = (s) => { setSymbol(s); setParams({ sym: s }); setMsg(""); setErr(""); };
 
   const submit = async (e) => {
@@ -39,6 +55,28 @@ export default function Trade() {
 
   return (
     <div data-testid="trade-page" style={{maxWidth:1280, margin:"0 auto", padding:24}} className="container-pad">
+      {/* Live portfolio summary — updates in real time as market ticks */}
+      <div className="panel" style={{padding:16, marginBottom:16, display:"flex", gap:24, alignItems:"center", flexWrap:"wrap"}} data-testid="portfolio-summary">
+        <div>
+          <div className="text-dim" style={{fontSize:12}}>Estimated Balance</div>
+          <div style={{fontSize:24, fontWeight:700, fontVariantNumeric:"tabular-nums"}} data-testid="portfolio-total">
+            ${fmtMoney(portfolio.total)} <span className="text-dim" style={{fontSize:13, fontWeight:500}}>USD</span>
+          </div>
+        </div>
+        <div style={{display:"flex", gap:16, flexWrap:"wrap"}}>
+          {portfolio.rows.map(r => (
+            <div key={r.sym} data-testid={`portfolio-${r.sym}`}>
+              <div className="text-dim" style={{fontSize:11}}>{r.sym}</div>
+              <div style={{fontSize:14, fontWeight:600}}>{fmtMoney(r.qty, r.sym==="USDT"?2:6)}</div>
+              <div className="text-dim" style={{fontSize:11}}>≈ ${fmtMoney(r.usd)}</div>
+            </div>
+          ))}
+          {portfolio.rows.length === 0 && (
+            <div className="text-dim" style={{fontSize:13}}>No holdings yet — deposit to start trading.</div>
+          )}
+        </div>
+      </div>
+
       <div style={{display:"grid", gridTemplateColumns:"260px 1fr 360px", gap:16}} className="trade-grid">
         {/* Pair list */}
         <div className="panel" style={{padding:12, maxHeight:600, overflowY:"auto"}}>
