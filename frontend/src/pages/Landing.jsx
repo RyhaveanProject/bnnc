@@ -1,8 +1,13 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { PriceTicker, MarketTable } from "../components/Market";
+import { useAuth } from "../lib/auth";
 
 export default function Landing() {
+  const { user } = useAuth();
+  // Logged-in users go straight to Trade. Logged-out users go to Register.
+  const ctaTarget = user ? "/trade" : "/register";
+  const ctaLabel = user ? "Go to Trading" : "Start Trading";
   return (
     <div className="hero-bg" data-testid="landing-page">
       <PriceTicker />
@@ -18,7 +23,7 @@ export default function Landing() {
               Buy, sell, deposit and withdraw USDT, BTC, ETH, TRX and BNB instantly.
             </p>
             <div style={{display:"flex", gap:12, marginTop:32}}>
-              <Link to="/register"><button className="btn btn-primary" data-testid="start-trading-btn">Start Trading</button></Link>
+              <Link to={ctaTarget}><button className="btn btn-primary" data-testid="start-trading-btn">{ctaLabel}</button></Link>
               <Link to="/markets"><button className="btn btn-ghost" data-testid="view-markets-btn">View Markets</button></Link>
             </div>
             <div style={{display:"flex", gap:48, marginTop:56, flexWrap:"wrap"}}>
