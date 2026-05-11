@@ -9,6 +9,7 @@ import uuid
 import asyncio
 import logging
 import base64
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal
 
@@ -33,16 +34,25 @@ db = client[os.environ['DB_NAME']]
 JWT_ALGORITHM = "HS256"
 SUPPORTED_CRYPTOS = ["USDT", "BTC", "ETH", "TRX", "BNB"]
 TRADING_PAIRS = ["BTC", "ETH", "BNB", "XRP", "SOL", "TRX", "USDT"]
-COIN_MAP = {
-    "BTC": "bitcoin", "ETH": "ethereum", "BNB": "binancecoin",
-    "XRP": "ripple", "SOL": "solana", "TRX": "tron", "USDT": "tether",
+COIN_NAMES = {
+    "BTC": "Bitcoin", "ETH": "Ethereum", "BNB": "BNB",
+    "XRP": "XRP", "SOL": "Solana", "TRX": "TRON", "USDT": "Tether",
 }
+# Static fallback prices (used only when ALL external APIs fail and no cache exists)
+STATIC_FALLBACK = {
+    "BTC": 95000.0, "ETH": 3400.0, "BNB": 690.0, "XRP": 2.20,
+    "SOL": 195.0, "TRX": 0.24, "USDT": 1.0,
+}
+KUCOIN_BASE = "https://api.kucoin.com"
+
 
 def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
 
+
 def hash_password(pwd: str) -> str:
     return bcrypt.hashpw(pwd.encode(), bcrypt.gensalt()).decode()
+
 
 def verify_password(plain: str, hashed: str) -> bool:
     try:
@@ -50,13 +60,16 @@ def verify_password(plain: str, hashed: str) -> bool:
     except Exception:
         return False
 
+
 def create_access_token(user_id: str, email: str, role: str) -> str:
     payload = {"sub": user_id, "email": email, "role": role,
                "exp": datetime.now(timezone.utc) + timedelta(hours=12), "type": "access"}
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
 
 # --- Models ---
 class RegisterIn(BaseModel):
@@ -64,34 +77,41 @@ class RegisterIn(BaseModel):
     password: str = Field(min_length=8)
     username: str = Field(min_length=3, max_length=32)
 
+
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
 
 class AdminCreateIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     username: str = Field(min_length=3)
 
+
 class BalanceAdjustIn(BaseModel):
     user_id: str
     currency: str
-    amount: float  # positive add, negative subtract
+    amount: float
+
 
 class WalletConfigIn(BaseModel):
     currency: str
     address: str
     network: Optional[str] = None
-    qr_image_b64: Optional[str] = None  # data url or pure base64
+    qr_image_b64: Optional[str] = None
+
 
 class DepositCreateIn(BaseModel):
     currency: str
     network: Optional[str] = None
     amount: float
 
+
 class DepositConfirmIn(BaseModel):
     deposit_id: str
-    receipt_b64: str  # base64 image data url
+    receipt_b64: str
+
 
 class WithdrawIn(BaseModel):
     currency: str
@@ -99,10 +119,12 @@ class WithdrawIn(BaseModel):
     address: str
     network: Optional[str] = None
 
+
 class TradeIn(BaseModel):
-    symbol: str  # e.g. BTC
+    symbol: str
     side: Literal["buy", "sell"]
-    amount: float  # in USDT (buy) or in coin (sell)
+    amount: float
+
 
 # --- App ---
 app = FastAPI(title="ADX America")
@@ -116,6 +138,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # --- Auth dependency ---
 async def get_token_from_request(request: Request) -> Optional[str]:
     token = request.cookies.get("access_token")
@@ -124,6 +147,7 @@ async def get_token_from_request(request: Request) -> Optional[str]:
         if auth.startswith("Bearer "):
             token = auth[7:]
     return token
+
 
 async def get_current_user(request: Request) -> dict:
     token = await get_token_from_request(request)
@@ -142,20 +166,24 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=403, detail="Account banned")
     return user
 
+
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     return user
 
+
 # --- Helpers ---
 def empty_balances() -> dict:
     return {c: 0.0 for c in SUPPORTED_CRYPTOS}
+
 
 def set_auth_cookie(resp: Response, token: str):
     resp.set_cookie(
         key="access_token", value=token, httponly=True, secure=False,
         samesite="lax", max_age=43200, path="/",
     )
+
 
 # --- Startup ---
 @app.on_event("startup")
@@ -183,10 +211,8 @@ async def startup():
         })
         logger.info("Seeded admin: %s", admin_email)
     else:
-        # Ensure pwd in env matches
         if not verify_password(admin_pwd, existing["password_hash"]):
             await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_pwd)}})
-    # Seed default wallet configs from env
     for cur in SUPPORTED_CRYPTOS:
         env_key = f"{cur}_WALLET"
         addr = os.environ.get(env_key, "")
@@ -196,10 +222,17 @@ async def startup():
                 {"$setOnInsert": {"currency": cur, "address": addr, "network": cur, "qr_image_b64": "", "updated_at": now_iso()}},
                 upsert=True,
             )
+    # Warm up market cache so first page load is instant
+    try:
+        asyncio.create_task(_refresh_market_cache())
+    except Exception as e:
+        logger.warning("Market warmup failed: %s", e)
+
 
 @app.on_event("shutdown")
 async def shutdown():
     client.close()
+
 
 # ============ AUTH ============
 @api.post("/auth/register")
@@ -207,11 +240,9 @@ async def register(data: RegisterIn, response: Response):
     email = data.email.lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="Email already registered")
-    # Strong password check
     pwd = data.password
     if len(pwd) < 8 or not any(c.isdigit() for c in pwd) or not any(c.isalpha() for c in pwd):
         raise HTTPException(status_code=400, detail="Password must be 8+ chars and contain letters and numbers")
-    # Artificial 5-second delay as requested
     await asyncio.sleep(5)
     uid = str(uuid.uuid4())
     user_doc = {
@@ -229,22 +260,43 @@ async def register(data: RegisterIn, response: Response):
     set_auth_cookie(response, token)
     return {"token": token, "user": {"id": uid, "email": email, "username": data.username, "role": "user", "balances": user_doc["balances"]}}
 
+
 @api.post("/auth/login")
 async def login(data: LoginIn, response: Response):
+    """Unified login. If credentials match ADMIN_EMAIL/ADMIN_PASSWORD (or any user with admin role),
+    an admin token is returned. Otherwise a regular user token is returned.
+    Admin login is intentionally hidden — no separate UI is required.
+    """
     email = data.email.lower()
-    user = await db.users.find_one({"email": email, "role": {"$ne": "admin"}})
+    user = await db.users.find_one({"email": email})
     if not user or not verify_password(data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if user.get("banned"):
         raise HTTPException(status_code=403, detail="Account banned")
-    token = create_access_token(user["id"], email, user["role"])
+    role = user.get("role", "user")
+    token = create_access_token(user["id"], email, role)
     set_auth_cookie(response, token)
-    # Track session
-    await db.sessions.insert_one({"user_id": user["id"], "created_at": now_iso(), "expires_at": (datetime.now(timezone.utc)+timedelta(hours=12)).isoformat()})
-    return {"token": token, "user": {"id": user["id"], "email": email, "username": user["username"], "role": user["role"], "balances": user.get("balances", empty_balances())}}
+    await db.sessions.insert_one({
+        "user_id": user["id"],
+        "created_at": now_iso(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(hours=12)).isoformat(),
+    })
+    return {
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "email": email,
+            "username": user["username"],
+            "role": role,
+            "balances": user.get("balances", empty_balances()),
+        },
+    }
+
 
 @api.post("/admin/login")
 async def admin_login(data: LoginIn, response: Response):
+    """Backward-compatible admin login endpoint. Internally identical to /auth/login
+    but enforces that the resolved user is an admin."""
     email = data.email.lower()
     user = await db.users.find_one({"email": email, "role": "admin"})
     if not user or not verify_password(data.password, user["password_hash"]):
@@ -253,63 +305,168 @@ async def admin_login(data: LoginIn, response: Response):
     set_auth_cookie(response, token)
     return {"token": token, "user": {"id": user["id"], "email": email, "username": user["username"], "role": "admin"}}
 
+
 @api.post("/auth/logout")
 async def logout(response: Response):
     response.delete_cookie("access_token", path="/")
     return {"ok": True}
 
+
 @api.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return user
 
-# ============ MARKET ============
-_MARKET_CACHE = {"data": [], "ts": 0}
+
+# ============ MARKET (KuCoin) ============
+_MARKET_CACHE = {"data": [], "ts": 0.0, "lock": asyncio.Lock()}
+_MARKET_TTL = 15.0  # seconds
+
+
+async def _kucoin_all_tickers(cli: httpx.AsyncClient) -> dict:
+    """Fetch all tickers from KuCoin with simple retry."""
+    last_err = None
+    for attempt in range(3):
+        try:
+            r = await cli.get(f"{KUCOIN_BASE}/api/v1/market/allTickers", timeout=8.0)
+            r.raise_for_status()
+            j = r.json()
+            if j.get("code") != "200000":
+                raise RuntimeError(f"KuCoin error code: {j.get('code')}")
+            return {t["symbol"]: t for t in j["data"]["ticker"]}
+        except Exception as e:
+            last_err = e
+            await asyncio.sleep(0.4 * (attempt + 1))
+    raise last_err or RuntimeError("KuCoin allTickers failed")
+
+
+async def _kucoin_sparkline(cli: httpx.AsyncClient, symbol: str) -> List[float]:
+    """Fetch 1-hour candles for the last ~24h. Returns list of close prices (oldest→newest)."""
+    end = int(time.time())
+    start = end - 24 * 3600
+    try:
+        r = await cli.get(
+            f"{KUCOIN_BASE}/api/v1/market/candles",
+            params={"type": "1hour", "symbol": symbol, "startAt": start, "endAt": end},
+            timeout=6.0,
+        )
+        r.raise_for_status()
+        j = r.json()
+        data = j.get("data") or []
+        # KuCoin returns newest first: [time, open, close, high, low, volume, turnover]
+        return [float(d[2]) for d in reversed(data)][-30:]
+    except Exception:
+        return []
+
+
+async def _build_market_data() -> List[dict]:
+    """Build market data list from KuCoin (single allTickers call + parallel sparklines)."""
+    async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "ADX-America/1.0"}) as cli:
+        tickers = await _kucoin_all_tickers(cli)
+
+        coins_for_candles = [c for c in TRADING_PAIRS if c != "USDT"]
+        spark_results = await asyncio.gather(
+            *[_kucoin_sparkline(cli, f"{c}-USDT") for c in coins_for_candles],
+            return_exceptions=True,
+        )
+        spark_map = {}
+        for coin, res in zip(coins_for_candles, spark_results):
+            spark_map[coin] = res if isinstance(res, list) else []
+
+    out = []
+    for coin in TRADING_PAIRS:
+        if coin == "USDT":
+            out.append({
+                "symbol": "USDT",
+                "name": COIN_NAMES["USDT"],
+                "price": 1.0,
+                "change24h": 0.0,
+                "marketCap": 0,
+                "volume24h": 0,
+                "sparkline": [1.0, 1.0, 1.0, 1.0],
+                "image": None,
+            })
+            continue
+        sym = f"{coin}-USDT"
+        t = tickers.get(sym, {})
+        try:
+            price = float(t.get("last") or 0)
+        except (TypeError, ValueError):
+            price = 0.0
+        try:
+            # KuCoin changeRate is a ratio (e.g. 0.0234 = 2.34%)
+            change_rate = float(t.get("changeRate") or 0) * 100
+        except (TypeError, ValueError):
+            change_rate = 0.0
+        try:
+            volume = float(t.get("volValue") or 0)
+        except (TypeError, ValueError):
+            volume = 0.0
+        out.append({
+            "symbol": coin,
+            "name": COIN_NAMES.get(coin, coin),
+            "price": price,
+            "change24h": change_rate,
+            "marketCap": 0,
+            "volume24h": volume,
+            "sparkline": spark_map.get(coin, []),
+            "image": None,
+        })
+    return out
+
+
+def _static_fallback_data() -> List[dict]:
+    """Last-resort fallback so the UI is never empty."""
+    out = []
+    for coin in TRADING_PAIRS:
+        price = STATIC_FALLBACK.get(coin, 0.0)
+        out.append({
+            "symbol": coin,
+            "name": COIN_NAMES.get(coin, coin),
+            "price": price,
+            "change24h": 0.0,
+            "marketCap": 0,
+            "volume24h": 0,
+            "sparkline": [price, price, price, price],
+            "image": None,
+        })
+    return out
+
+
+async def _refresh_market_cache():
+    """Refresh cache. Safe to call concurrently — uses lock to dedupe."""
+    if _MARKET_CACHE["lock"].locked():
+        # Another refresh in progress; wait for it
+        async with _MARKET_CACHE["lock"]:
+            return _MARKET_CACHE["data"]
+    async with _MARKET_CACHE["lock"]:
+        try:
+            data = await _build_market_data()
+            _MARKET_CACHE["data"] = data
+            _MARKET_CACHE["ts"] = time.time()
+            return data
+        except Exception as e:
+            logger.error("KuCoin market fetch failed: %s", e)
+            if _MARKET_CACHE["data"]:
+                return _MARKET_CACHE["data"]
+            # First-ever request and KuCoin failed → return static fallback (don't cache it)
+            return _static_fallback_data()
+
 
 @api.get("/market/prices")
 async def market_prices():
-    """Live crypto prices via CoinGecko (cached 8s)."""
-    import time
+    """Live crypto prices via KuCoin (cached ~15s, parallel sparklines, retry + fallback)."""
     now = time.time()
-    if _MARKET_CACHE["data"] and now - _MARKET_CACHE["ts"] < 8:
+    if _MARKET_CACHE["data"] and now - _MARKET_CACHE["ts"] < _MARKET_TTL:
         return _MARKET_CACHE["data"]
-    ids = ",".join(COIN_MAP.values())
-    url = f"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids={ids}&order=market_cap_desc&sparkline=true&price_change_percentage=24h"
-    try:
-        async with httpx.AsyncClient(timeout=10) as cli:
-            r = await cli.get(url)
-            r.raise_for_status()
-            raw = r.json()
-        out = []
-        rev = {v: k for k, v in COIN_MAP.items()}
-        for c in raw:
-            sym = rev.get(c["id"], c.get("symbol", "").upper())
-            out.append({
-                "symbol": sym,
-                "name": c.get("name"),
-                "price": c.get("current_price") or 0,
-                "change24h": c.get("price_change_percentage_24h") or 0,
-                "marketCap": c.get("market_cap") or 0,
-                "volume24h": c.get("total_volume") or 0,
-                "sparkline": (c.get("sparkline_in_7d") or {}).get("price", [])[-30:],
-                "image": c.get("image"),
-            })
-        # Order by TRADING_PAIRS
-        order = {s: i for i, s in enumerate(TRADING_PAIRS)}
-        out.sort(key=lambda x: order.get(x["symbol"], 999))
-        _MARKET_CACHE["data"] = out
-        _MARKET_CACHE["ts"] = now
-        return out
-    except Exception as e:
-        logger.error("Market fetch failed: %s", e)
-        if _MARKET_CACHE["data"]:
-            return _MARKET_CACHE["data"]
-        raise HTTPException(status_code=503, detail="Market data unavailable")
+    return await _refresh_market_cache()
+
 
 # ============ WALLETS ============
 @api.get("/wallets")
 async def get_wallets():
     configs = await db.wallet_configs.find({}, {"_id": 0}).to_list(100)
     return configs
+
 
 @api.put("/admin/wallets")
 async def update_wallet(data: WalletConfigIn, admin: dict = Depends(require_admin)):
@@ -328,6 +485,7 @@ async def update_wallet(data: WalletConfigIn, admin: dict = Depends(require_admi
     cfg = await db.wallet_configs.find_one({"currency": data.currency}, {"_id": 0})
     return cfg
 
+
 # ============ TELEGRAM ============
 async def tg_send(method: str, payload: dict, files: dict = None) -> dict:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -345,6 +503,7 @@ async def tg_send(method: str, payload: dict, files: dict = None) -> dict:
     except Exception as e:
         logger.error("Telegram send error: %s", e)
         return {"ok": False, "error": str(e)}
+
 
 async def notify_deposit(deposit: dict, user: dict, receipt_b64: Optional[str]):
     chat_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
@@ -365,7 +524,6 @@ async def notify_deposit(deposit: dict, user: dict, receipt_b64: Optional[str]):
         {"text": "❌ Reject", "callback_data": f"rdep:{deposit['id']}"},
     ]]}
     if receipt_b64:
-        # strip data url
         b64 = receipt_b64.split(",", 1)[-1]
         try:
             img_bytes = base64.b64decode(b64)
@@ -378,6 +536,7 @@ async def notify_deposit(deposit: dict, user: dict, receipt_b64: Optional[str]):
             await tg_send("sendPhoto", data, files=files)
             return
     await tg_send("sendMessage", {"chat_id": chat_id, "text": caption, "parse_mode": "Markdown", "reply_markup": kb})
+
 
 async def notify_withdraw(w: dict, user: dict):
     chat_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
@@ -402,9 +561,9 @@ async def notify_withdraw(w: dict, user: dict):
     ]]}
     await tg_send("sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "Markdown", "reply_markup": kb})
 
+
 @api.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
-    """Handles inline button callbacks from Telegram."""
     body = await request.json()
     cb = body.get("callback_query")
     if not cb:
@@ -415,13 +574,12 @@ async def telegram_webhook(request: Request):
     msg = cb.get("message", {})
     msg_chat_id = str(msg.get("chat", {}).get("id", ""))
     msg_id = msg.get("message_id")
-    # auth: only configured admin chat may approve
     if chat_id_admin and msg_chat_id != str(chat_id_admin):
         await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Unauthorized"})
         return {"ok": True}
 
     op, _, target_id = data.partition(":")
-    if op == "adep":  # approve deposit
+    if op == "adep":
         dep = await db.deposits.find_one({"id": target_id}, {"_id": 0})
         if not dep:
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Deposit not found"})
@@ -439,7 +597,7 @@ async def telegram_webhook(request: Request):
         await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Deposit rejected ❌"})
         if msg_id:
             await tg_send("editMessageReplyMarkup", {"chat_id": msg_chat_id, "message_id": msg_id, "reply_markup": {"inline_keyboard": [[{"text": "❌ REJECTED", "callback_data": "noop"}]]}})
-    elif op == "awd":  # withdraw paid
+    elif op == "awd":
         w = await db.withdrawals.find_one({"id": target_id}, {"_id": 0})
         if not w:
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Not found"})
@@ -451,13 +609,13 @@ async def telegram_webhook(request: Request):
     elif op == "rwd":
         w = await db.withdrawals.find_one({"id": target_id}, {"_id": 0})
         if w and w["status"] == "pending":
-            # refund balance
             await db.users.update_one({"id": w["user_id"]}, {"$inc": {f"balances.{w['currency']}": w["amount"]}})
         await db.withdrawals.update_one({"id": target_id}, {"$set": {"status": "rejected", "approved_at": now_iso()}})
         await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Withdraw rejected"})
         if msg_id:
             await tg_send("editMessageReplyMarkup", {"chat_id": msg_chat_id, "message_id": msg_id, "reply_markup": {"inline_keyboard": [[{"text": "❌ REJECTED", "callback_data": "noop"}]]}})
     return {"ok": True}
+
 
 # ============ DEPOSITS ============
 @api.post("/deposits/create")
@@ -486,6 +644,7 @@ async def deposit_create(data: DepositCreateIn, user: dict = Depends(get_current
     await db.deposits.insert_one(dep)
     return {"deposit": {k: v for k, v in dep.items() if k != "receipt_b64"}, "wallet": wallet}
 
+
 @api.post("/deposits/confirm")
 async def deposit_confirm(data: DepositConfirmIn, user: dict = Depends(get_current_user)):
     dep = await db.deposits.find_one({"id": data.deposit_id, "user_id": user["id"]}, {"_id": 0})
@@ -495,17 +654,19 @@ async def deposit_confirm(data: DepositConfirmIn, user: dict = Depends(get_curre
         raise HTTPException(status_code=400, detail="Deposit already processed")
     await db.deposits.update_one({"id": dep["id"]}, {"$set": {"receipt_b64": data.receipt_b64, "confirmed_by_user": True, "confirmed_at": now_iso()}})
     dep["receipt_b64"] = data.receipt_b64
-    # fire and forget telegram
     asyncio.create_task(notify_deposit(dep, user, data.receipt_b64))
     return {"ok": True}
+
 
 @api.get("/deposits/me")
 async def deposits_me(user: dict = Depends(get_current_user)):
     rows = await db.deposits.find({"user_id": user["id"]}, {"_id": 0, "receipt_b64": 0}).sort("created_at", -1).to_list(200)
     return rows
 
+
 # ============ WITHDRAWALS ============
-FEE_RATE = {"USDT": 1.0, "BTC": 0.0005, "ETH": 0.005, "TRX": 1.0, "BNB": 0.001}  # flat fee in coin
+FEE_RATE = {"USDT": 1.0, "BTC": 0.0005, "ETH": 0.005, "TRX": 1.0, "BNB": 0.001}
+
 
 @api.post("/withdrawals/create")
 async def withdraw_create(data: WithdrawIn, user: dict = Depends(get_current_user)):
@@ -534,7 +695,6 @@ async def withdraw_create(data: WithdrawIn, user: dict = Depends(get_current_use
         "status": "pending",
         "created_at": now_iso(),
     }
-    # Deduct immediately (reservation)
     res = await db.users.update_one(
         {"id": user["id"], f"balances.{data.currency}": {"$gte": data.amount}},
         {"$inc": {f"balances.{data.currency}": -data.amount}},
@@ -545,10 +705,12 @@ async def withdraw_create(data: WithdrawIn, user: dict = Depends(get_current_use
     asyncio.create_task(notify_withdraw(w, user))
     return {"withdrawal": w}
 
+
 @api.get("/withdrawals/me")
 async def withdrawals_me(user: dict = Depends(get_current_user)):
     rows = await db.withdrawals.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
     return rows
+
 
 # ============ TRADING ============
 async def _price(symbol: str) -> float:
@@ -557,6 +719,7 @@ async def _price(symbol: str) -> float:
         if p["symbol"] == symbol:
             return float(p["price"])
     raise HTTPException(status_code=400, detail="Symbol not found")
+
 
 @api.post("/trade/execute")
 async def trade_execute(data: TradeIn, user: dict = Depends(get_current_user)):
@@ -568,7 +731,6 @@ async def trade_execute(data: TradeIn, user: dict = Depends(get_current_user)):
     price = await _price(sym)
     bal = user.get("balances", {})
     if data.side == "buy":
-        # amount is in USDT
         cost = data.amount
         if bal.get("USDT", 0) < cost:
             raise HTTPException(status_code=400, detail="Insufficient USDT balance")
@@ -581,7 +743,6 @@ async def trade_execute(data: TradeIn, user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=400, detail="Insufficient USDT balance")
         executed = {"qty": coin_qty, "spent": cost}
     else:
-        # sell: amount is in coin
         qty = data.amount
         if bal.get(sym, 0) < qty:
             raise HTTPException(status_code=400, detail=f"Insufficient {sym} balance")
@@ -604,19 +765,21 @@ async def trade_execute(data: TradeIn, user: dict = Depends(get_current_user)):
         "created_at": now_iso(),
     }
     await db.trades.insert_one(trade)
-    # return updated user
     updated = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
     return {"trade": trade, "user": updated}
+
 
 @api.get("/trade/history")
 async def trade_history(user: dict = Depends(get_current_user)):
     rows = await db.trades.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
     return rows
 
+
 # ============ CONFIG / MISC ============
 @api.get("/config/live-chat")
 async def live_chat_url():
     return {"url": os.environ.get("LIVE_CHAT_URL", "")}
+
 
 # ============ ADMIN ============
 @api.get("/admin/stats")
@@ -625,25 +788,28 @@ async def admin_stats(admin: dict = Depends(require_admin)):
     banned = await db.users.count_documents({"role": "user", "banned": True})
     pending_deps = await db.deposits.count_documents({"status": "pending"})
     pending_wds = await db.withdrawals.count_documents({"status": "pending"})
-    # Live users: sessions in last 15 min
     cutoff = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
     live = await db.sessions.count_documents({"created_at": {"$gte": cutoff}})
     return {"total_users": total_users, "banned_users": banned, "pending_deposits": pending_deps, "pending_withdrawals": pending_wds, "live_users": live}
+
 
 @api.get("/admin/users")
 async def admin_users(admin: dict = Depends(require_admin)):
     rows = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
     return rows
 
+
 @api.post("/admin/users/{user_id}/ban")
 async def admin_ban(user_id: str, admin: dict = Depends(require_admin)):
     await db.users.update_one({"id": user_id}, {"$set": {"banned": True}})
     return {"ok": True}
 
+
 @api.post("/admin/users/{user_id}/unban")
 async def admin_unban(user_id: str, admin: dict = Depends(require_admin)):
     await db.users.update_one({"id": user_id}, {"$set": {"banned": False}})
     return {"ok": True}
+
 
 @api.post("/admin/users/balance")
 async def admin_balance(data: BalanceAdjustIn, admin: dict = Depends(require_admin)):
@@ -657,6 +823,7 @@ async def admin_balance(data: BalanceAdjustIn, admin: dict = Depends(require_adm
         raise HTTPException(status_code=400, detail="Resulting balance negative")
     await db.users.update_one({"id": data.user_id}, {"$inc": {f"balances.{data.currency}": data.amount}})
     return {"ok": True, "new_balance": new_bal}
+
 
 @api.post("/admin/create")
 async def admin_create(data: AdminCreateIn, admin: dict = Depends(require_admin)):
@@ -675,10 +842,12 @@ async def admin_create(data: AdminCreateIn, admin: dict = Depends(require_admin)
     })
     return {"ok": True}
 
+
 @api.get("/admin/deposits")
 async def admin_deposits(admin: dict = Depends(require_admin)):
     rows = await db.deposits.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     return rows
+
 
 @api.post("/admin/deposits/{dep_id}/approve")
 async def admin_approve_deposit(dep_id: str, admin: dict = Depends(require_admin)):
@@ -691,19 +860,23 @@ async def admin_approve_deposit(dep_id: str, admin: dict = Depends(require_admin
     await db.users.update_one({"id": dep["user_id"]}, {"$inc": {f"balances.{dep['currency']}": dep["amount"]}})
     return {"ok": True}
 
+
 @api.post("/admin/deposits/{dep_id}/reject")
 async def admin_reject_deposit(dep_id: str, admin: dict = Depends(require_admin)):
     await db.deposits.update_one({"id": dep_id}, {"$set": {"status": "rejected", "approved_at": now_iso()}})
     return {"ok": True}
+
 
 @api.get("/admin/withdrawals")
 async def admin_withdrawals(admin: dict = Depends(require_admin)):
     rows = await db.withdrawals.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     return rows
 
+
 # ---
 @api.get("/")
 async def root():
     return {"name": "ADX America API", "status": "ok"}
+
 
 app.include_router(api)
