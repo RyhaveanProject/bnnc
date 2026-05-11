@@ -14,8 +14,12 @@ export default function Withdraw() {
   const [busy, setBusy] = useState(false);
 
   const loadHistory = async () => {
-    const { data } = await api.get("/withdrawals/me");
-    setHistory(data);
+    try {
+      const { data } = await api.get("/withdrawals/me");
+      setHistory(data || []);
+    } catch {
+      /* ignore network/auth errors here */
+    }
   };
   useEffect(() => { loadHistory(); }, []);
 
