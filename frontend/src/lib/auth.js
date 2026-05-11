@@ -45,9 +45,11 @@ export function AuthProvider({ children }) {
           localStorage.removeItem("adx_token");
           setUser(null);
         } else {
-          // Network/timeout — keep token, but mark as unknown user so
-          // ProtectedRoute briefly waits for a retry rather than logging out.
-          setUser(null);
+          // Network/timeout — keep token AND keep prior user state to avoid
+          // accidental logout on transient failures. If user is still
+          // undefined (first load), leave it undefined so ProtectedRoute
+          // keeps showing the loader instead of redirecting to /login.
+          setUser((prev) => (prev === undefined ? undefined : prev));
         }
         return null;
       } finally {
@@ -67,6 +69,18 @@ export function AuthProvider({ children }) {
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
+  }, [refresh]);
+
+  // Periodic background refresh: keeps user.balances in sync after the admin
+  // confirms a deposit in Telegram (no full reload needed). Polls every 15s
+  // only when there is a token present.
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (localStorage.getItem("adx_token")) {
+        refresh();
+      }
+    }, 15000);
+    return () => clearInterval(t);
   }, [refresh]);
 
   const login = async (email, password) => {
