@@ -8,9 +8,9 @@ export default function History() {
   const [tab, setTab] = useState("trades");
 
   useEffect(() => {
-    api.get("/trade/history").then(r => setTrades(r.data));
-    api.get("/deposits/me").then(r => setDeps(r.data));
-    api.get("/withdrawals/me").then(r => setWds(r.data));
+    api.get("/trade/history").then(r => setTrades(r.data || [])).catch(() => {});
+    api.get("/deposits/me").then(r => setDeps(r.data || [])).catch(() => {});
+    api.get("/withdrawals/me").then(r => setWds(r.data || [])).catch(() => {});
   }, []);
 
   return (
@@ -51,7 +51,7 @@ export default function History() {
                   <td style={{fontSize:12}}>{new Date(d.created_at).toLocaleString()}</td>
                   <td>{d.currency}</td>
                   <td>{d.amount}</td>
-                  <td>{d.status === "pending" ? <span className="pill pending">⏱ Pending</span> : d.status === "approved" ? <span className="pill approved">✓ Confirmed</span> : <span className="pill rejected">✕ {d.status}</span>}</td>
+                  <td>{d.status === "pending" ? <span className="pill pending">⏱ Pending</span> : (d.status === "approved" || d.status === "completed") ? <span className="pill approved">✓ Completed</span> : <span className="pill rejected">✕ {d.status}</span>}</td>
                 </tr>
               ))}
             </tbody>
