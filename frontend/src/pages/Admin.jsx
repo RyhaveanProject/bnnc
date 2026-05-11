@@ -1,318 +1,264 @@
-
-Action: file_editor create /app/frontend/src/Admin.jsx --file-text "import React, { useEffect, useState, useRef } from \"react\";
-import client from \"./api\";
-import Navbar from \"./Navbar\";
-import { useAuth, formatError } from \"./auth\";
+Now the admin panel:
+Action: file_editor create /app/frontend/src/pages/Admin.jsx --file-text "import React, { useEffect, useState } from \"react\";
+import api, { SUPPORTED_CRYPTOS, fmtMoney } from \"../lib/api\";
+import { formatErr } from \"../lib/auth\";
 
 export default function Admin() {
-  const { user } = useAuth();
   const [tab, setTab] = useState(\"dashboard\");
-  if (user?.role !== \"admin\") {
-    return (
-      <div>
-        <Navbar />
-        <div style={{ padding: 40, textAlign: \"center\", color: \"var(--bnnc-red)\" }}>Admin icazəsi yoxdur</div>
-      </div>
-    );
-  }
   return (
-    <div>
-      <Navbar />
-      <div style={{ maxWidth: 1440, margin: \"0 auto\", padding: 24 }}>
-        <h2>🧑‍💼 Admin Panel</h2>
-        <div style={{ display: \"flex\", gap: 4, borderBottom: \"1px solid var(--bnnc-border)\", marginBottom: 20, flexWrap: \"wrap\" }}>
-          {[
-            [\"dashboard\", \"Dashboard\"],
-            [\"users\", \"Users\"],
-            [\"deposits\", \"Deposits\"],
-            [\"withdrawals\", \"Withdrawals\"],
-            [\"trades\", \"Trades\"],
-            [\"qr\", \"QR Codes\"],
-            [\"create-admin\", \"New Admin\"],
-          ].map(([k, l]) => (
-            <div key={k} className={`tab ${tab === k ? \"active\" : \"\"}`} onClick={() => setTab(k)} data-testid={`admin-tab-${k}`}>{l}</div>
-          ))}
-        </div>
-        {tab === \"dashboard\" && <Dashboard />}
-        {tab === \"users\" && <UsersTab />}
-        {tab === \"deposits\" && <TxTab type=\"deposit\"/>}
-        {tab === \"withdrawals\" && <TxTab type=\"withdraw\"/>}
-        {tab === \"trades\" && <TxTab type=\"trade\"/>}
-        {tab === \"qr\" && <QrTab />}
-        {tab === \"create-admin\" && <CreateAdminTab />}
+    <div data-testid=\"admin-page\" style={{maxWidth:1400, margin:\"0 auto\", padding:24}} className=\"container-pad\">
+      <h1 style={{margin:\"0 0 16px\"}}>Admin Panel</h1>
+      <div style={{display:\"flex\", gap:8, marginBottom:16, flexWrap:\"wrap\"}}>
+        {[
+          [\"dashboard\",\"Dashboard\"],[\"users\",\"Users\"],[\"deposits\",\"Deposits\"],
+          [\"withdrawals\",\"Withdrawals\"],[\"wallets\",\"Wallets / QR\"],[\"new-admin\",\"New Admin\"]
+        ].map(([k,l]) => (
+          <button key={k} onClick={()=>setTab(k)} data-testid={`admin-tab-${k}`}
+            className={`btn btn-sm ${tab===k?\"btn-primary\":\"btn-ghost\"}`}>{l}</button>
+        ))}
       </div>
+      {tab === \"dashboard\" && <Dashboard />}
+      {tab === \"users\" && <Users />}
+      {tab === \"deposits\" && <Deposits />}
+      {tab === \"withdrawals\" && <Withdrawals />}
+      {tab === \"wallets\" && <Wallets />}
+      {tab === \"new-admin\" && <NewAdmin />}
     </div>
   );
 }
 
 function Dashboard() {
-  const [s, setS] = useState({});
+  const [stats, setStats] = useState(null);
   useEffect(() => {
-    const load = async () => {
-      try { const { data } = await client.get(\"/admin/stats\"); setS(data); } catch {}
-    };
+    const load = () => api.get(\"/admin/stats\").then(r => setStats(r.data));
     load();
-    const id = setInterval(load, 5000);
-    return () => clearInterval(id);
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
   }, []);
-  const card = (label, value, color = \"var(--bnnc-text)\") => (
-    <div className=\"bnnc-card\" style={{ padding: 20 }}>
-      <div style={{ color: \"var(--bnnc-text-dim)\", fontSize: 13 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 700, marginTop: 6, color }}>{value ?? 0}</div>
-    </div>
-  );
+  if (!stats) return <div className=\"text-dim\">Loading…</div>;
+  const items = [
+    [\"Live Users (15m)\", stats.live_users],
+    [\"Total Users\", stats.total_users],
+    [\"Banned Users\", stats.banned_users],
+    [\"Pending Deposits\", stats.pending_deposits],
+    [\"Pending Withdrawals\", stats.pending_withdrawals],
+  ];
   return (
-    <div style={{ display: \"grid\", gridTemplateColumns: \"repeat(3, 1fr)\", gap: 16 }}>
-      {card(\"Total Users\", s.total_users)}
-      {card(\"Active Users\", s.active_users, \"var(--bnnc-green)\")}
-      {card(\"Banned\", s.banned_users, \"var(--bnnc-red)\")}
-      {card(\"Live Users (5m)\", s.live_users, \"var(--bnnc-gold)\")}
-      {card(\"Pending Deposits\", s.pending_deposits, \"var(--bnnc-gold)\")}
-      {card(\"Pending Withdrawals\", s.pending_withdrawals, \"var(--bnnc-gold)\")}
-    </div>
-  );
-}
-
-function UsersTab() {
-  const [users, setUsers] = useState([]);
-  const [q, setQ] = useState(\"\");
-  const [adjustOpen, setAdjustOpen] = useState(null);
-
-  const load = async () => {
-    const { data } = await client.get(`/admin/users?q=${encodeURIComponent(q)}`);
-    setUsers(data.users || []);
-  };
-  useEffect(() => { load(); }, []); // initial
-
-  const search = (e) => { e.preventDefault(); load(); };
-
-  const ban = async (id, banned) => {
-    await client.post(\"/admin/ban\", { user_id: id, banned });
-    load();
-  };
-
-  return (
-    <>
-      <form onSubmit={search} style={{ display: \"flex\", gap: 8, marginBottom: 16 }}>
-        <input className=\"bnnc-input\" placeholder=\"Email və ya username axtar\" value={q} onChange={(e)=>setQ(e.target.value)} style={{ maxWidth: 400 }} data-testid=\"admin-user-search\"/>
-        <button className=\"bnnc-btn\" type=\"submit\">Search</button>
-      </form>
-      <div className=\"bnnc-card\">
-        <table className=\"bnnc-table\">
-          <thead><tr><th>Email</th><th>Username</th><th>Role</th><th>USDT</th><th>BTC</th><th>ETH</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} data-testid={`admin-user-${u.id}`}>
-                <td>{u.email}</td>
-                <td>{u.username}</td>
-                <td>{u.role}</td>
-                <td>{(u.balances?.USDT || 0).toFixed(2)}</td>
-                <td>{(u.balances?.BTC || 0).toFixed(6)}</td>
-                <td>{(u.balances?.ETH || 0).toFixed(6)}</td>
-                <td>{u.banned ? <span className=\"text-down\">Banned</span> : <span className=\"text-up\">Active</span>}</td>
-                <td style={{ display: \"flex\", gap: 6 }}>
-                  {u.role !== \"admin\" && (
-                    u.banned
-                      ? <button className=\"bnnc-btn-ghost bnnc-btn\" style={{ padding: \"4px 10px\", fontSize: 12 }} onClick={() => ban(u.id, false)} data-testid={`unban-${u.id}`}>Unban</button>
-                      : <button className=\"bnnc-btn-ghost bnnc-btn\" style={{ padding: \"4px 10px\", fontSize: 12, color: \"var(--bnnc-red)\" }} onClick={() => ban(u.id, true)} data-testid={`ban-${u.id}`}>Ban</button>
-                  )}
-                  <button className=\"bnnc-btn\" style={{ padding: \"4px 10px\", fontSize: 12 }} onClick={() => setAdjustOpen(u)} data-testid={`adjust-${u.id}`}>±Balance</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {adjustOpen && <AdjustModal user={adjustOpen} onClose={() => { setAdjustOpen(null); load(); }} />}
-    </>
-  );
-}
-
-function AdjustModal({ user, onClose }) {
-  const [cur, setCur] = useState(\"USDT\");
-  const [amt, setAmt] = useState(\"\");
-  const [note, setNote] = useState(\"\");
-  const [err, setErr] = useState(\"\");
-  const submit = async () => {
-    setErr(\"\");
-    try {
-      await client.post(\"/admin/adjust-balance\", { user_id: user.id, currency: cur, amount: Number(amt), note });
-      onClose();
-    } catch (e) { setErr(formatError(e)); }
-  };
-  return (
-    <div style={{ position: \"fixed\", inset: 0, background: \"rgba(0,0,0,0.7)\", display: \"flex\", alignItems: \"center\", justifyContent: \"center\", zIndex: 100 }}>
-      <div className=\"bnnc-card\" style={{ padding: 24, width: 420 }}>
-        <h3 style={{ marginTop: 0 }}>Adjust Balance: {user.email}</h3>
-        <label style={{ fontSize: 12, color: \"var(--bnnc-text-dim)\" }}>Currency</label>
-        <select className=\"bnnc-input\" value={cur} onChange={(e)=>setCur(e.target.value)} style={{ marginTop: 6, marginBottom: 12 }} data-testid=\"adjust-currency\">
-          {[\"USDT\",\"BTC\",\"ETH\",\"TRX\",\"BNB\"].map(c=><option key={c} value={c}>{c}</option>)}
-        </select>
-        <label style={{ fontSize: 12, color: \"var(--bnnc-text-dim)\" }}>Amount (mənfi rəqəm çıxarmaq üçün)</label>
-        <input className=\"bnnc-input\" type=\"number\" step=\"any\" value={amt} onChange={(e)=>setAmt(e.target.value)} style={{ marginTop: 6, marginBottom: 12 }} data-testid=\"adjust-amount\"/>
-        <label style={{ fontSize: 12, color: \"var(--bnnc-text-dim)\" }}>Note (optional)</label>
-        <input className=\"bnnc-input\" value={note} onChange={(e)=>setNote(e.target.value)} style={{ marginTop: 6, marginBottom: 12 }}/>
-        {err && <div className=\"text-down\" style={{ fontSize: 13 }}>{err}</div>}
-        <div style={{ display: \"flex\", gap: 8, marginTop: 14 }}>
-          <button className=\"bnnc-btn\" onClick={submit} data-testid=\"adjust-submit\">Apply</button>
-          <button className=\"bnnc-btn-ghost bnnc-btn\" onClick={onClose}>Cancel</button>
+    <div style={{display:\"grid\", gridTemplateColumns:\"repeat(auto-fit, minmax(180px, 1fr))\", gap:16}}>
+      {items.map(([l,v]) => (
+        <div key={l} className=\"panel\" style={{padding:20}} data-testid={`stat-${l}`}>
+          <div className=\"text-dim\" style={{fontSize:12, textTransform:\"uppercase\"}}>{l}</div>
+          <div style={{fontSize:28, fontWeight:700, marginTop:6}}>{v}</div>
         </div>
+      ))}
+    </div>
+  );
+}
+
+function Users() {
+  const [users, setUsers] = useState([]);
+  const [msg, setMsg] = useState(\"\");
+  const load = () => api.get(\"/admin/users\").then(r => setUsers(r.data));
+  useEffect(() => { load(); }, []);
+  const ban = async (id, banned) => {
+    await api.post(`/admin/users/${id}/${banned?\"unban\":\"ban\"}`);
+    load();
+  };
+  const adjust = async (id) => {
+    const cur = prompt(\"Currency (USDT/BTC/ETH/TRX/BNB):\", \"USDT\");
+    if (!cur) return;
+    const amt = prompt(\"Amount (positive=add, negative=subtract):\");
+    if (!amt) return;
+    try {
+      await api.post(\"/admin/users/balance\", { user_id: id, currency: cur.toUpperCase(), amount: parseFloat(amt) });
+      setMsg(\"Balance updated\"); load();
+    } catch (e) { setMsg(formatErr(e)); }
+  };
+  return (
+    <div className=\"panel\" data-testid=\"admin-users\">
+      {msg && <div style={{padding:12, fontSize:13}} className=\"text-yellow\">{msg}</div>}
+      <div style={{overflowX:\"auto\"}}>
+      <table className=\"tbl\">
+        <thead><tr><th>Email</th><th>Username</th><th>Role</th><th>Balances</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {users.map(u => (
+            <tr key={u.id}>
+              <td>{u.email}</td>
+              <td>{u.username}</td>
+              <td>{u.role}</td>
+              <td style={{fontSize:11}}>{Object.entries(u.balances||{}).filter(([_,v])=>v>0).map(([k,v])=>`${k}:${fmtMoney(v,4)}`).join(\" \") || \"—\"}</td>
+              <td>{u.banned ? <span className=\"pill rejected\">Banned</span> : <span className=\"pill approved\">Active</span>}</td>
+              <td>
+                {u.role !== \"admin\" && <>
+                  <button className=\"btn btn-ghost btn-sm\" onClick={()=>adjust(u.id)} data-testid={`adj-${u.id}`}>Balance</button>{\" \"}
+                  <button className={`btn btn-sm ${u.banned?\"btn-green\":\"btn-red\"}`} onClick={()=>ban(u.id, u.banned)} data-testid={`ban-${u.id}`}>{u.banned?\"Unban\":\"Ban\"}</button>
+                </>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       </div>
     </div>
   );
 }
 
-function TxTab({ type }) {
-  const [items, setItems] = useState([]);
-  const [status, setStatus] = useState(\"\");
-  const load = async () => {
-    const params = { type };
-    if (status) params.status = status;
-    const qs = new URLSearchParams(params).toString();
-    const { data } = await client.get(`/admin/transactions?${qs}`);
-    setItems(data.transactions || []);
-  };
-  useEffect(() => { load(); const id = setInterval(load, 6000); return () => clearInterval(id); }, [status]);
-
-  const approve = async (id) => {
-    const ep = type === \"deposit\" ? `/admin/approve-deposit/${id}` : `/admin/approve-withdraw/${id}`;
-    await client.post(ep);
+function Deposits() {
+  const [rows, setRows] = useState([]);
+  const load = () => api.get(\"/admin/deposits\").then(r => setRows(r.data));
+  useEffect(() => { load(); }, []);
+  const act = async (id, ok) => {
+    await api.post(`/admin/deposits/${id}/${ok?\"approve\":\"reject\"}`);
     load();
   };
-  const reject = async (id) => {
-    const ep = type === \"deposit\" ? `/admin/reject-deposit/${id}` : `/admin/reject-withdraw/${id}`;
-    await client.post(ep);
-    load();
-  };
-
   return (
-    <>
-      <div style={{ marginBottom: 12, display: \"flex\", gap: 8 }}>
-        {[\"\", \"pending\", \"approved\", \"rejected\", \"filled\"].map((s) => (
-          <button key={s||\"all\"} className={status === s ? \"bnnc-btn\" : \"bnnc-btn-ghost bnnc-btn\"} style={{ padding: \"6px 14px\", fontSize: 13 }} onClick={() => setStatus(s)}>
-            {s || \"All\"}
-          </button>
-        ))}
+    <div className=\"panel\" data-testid=\"admin-deposits\">
+      <div style={{overflowX:\"auto\"}}>
+      <table className=\"tbl\">
+        <thead><tr><th>Time</th><th>User</th><th>Currency</th><th>Amount</th><th>Receipt</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {rows.map(d => (
+            <tr key={d.id}>
+              <td style={{fontSize:12}}>{new Date(d.created_at).toLocaleString()}</td>
+              <td><div>{d.username}</div><div className=\"text-dim\" style={{fontSize:11}}>{d.email}</div></td>
+              <td>{d.currency}</td>
+              <td>{d.amount}</td>
+              <td>{d.receipt_b64 ? <a href={d.receipt_b64} target=\"_blank\" rel=\"noreferrer\" className=\"text-yellow\">View</a> : \"—\"}</td>
+              <td>{d.status === \"pending\" ? <span className=\"pill pending\">Pending</span> : d.status === \"approved\" ? <span className=\"pill approved\">Approved</span> : <span className=\"pill rejected\">{d.status}</span>}</td>
+              <td>
+                {d.status === \"pending\" && <>
+                  <button className=\"btn btn-green btn-sm\" onClick={()=>act(d.id, true)} data-testid={`apr-${d.id}`}>Approve</button>{\" \"}
+                  <button className=\"btn btn-red btn-sm\" onClick={()=>act(d.id, false)} data-testid={`rej-${d.id}`}>Reject</button>
+                </>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       </div>
-      <div className=\"bnnc-card\">
-        <table className=\"bnnc-table\">
-          <thead><tr><th>Time</th><th>User</th><th>Currency</th><th>Amount</th>{type === \"withdraw\" && <th>Fee</th>}{type === \"withdraw\" && <th>Address</th>}{type === \"trade\" && <th>Side</th>}{type === \"trade\" && <th>Price</th>}<th>Status</th>{type !== \"trade\" && <th>Actions</th>}</tr></thead>
-          <tbody>
-            {items.length === 0 && <tr><td colSpan={9} style={{ textAlign: \"center\", color: \"var(--bnnc-text-dim)\" }}>No {type}s</td></tr>}
-            {items.map((t) => (
-              <tr key={t.id} data-testid={`admin-${type}-${t.id}`}>
-                <td>{new Date(t.created_at).toLocaleString()}</td>
-                <td>{t.user?.email || t.user_id}</td>
-                <td>{t.currency || t.symbol}</td>
-                <td>{(t.amount || 0).toFixed(8)}</td>
-                {type === \"withdraw\" && <td>{t.fee?.toFixed(8)}</td>}
-                {type === \"withdraw\" && <td style={{ fontSize: 11 }}>{t.address?.slice(0, 18)}...</td>}
-                {type === \"trade\" && <td>{t.side}</td>}
-                {type === \"trade\" && <td>${t.price?.toFixed(2)}</td>}
-                <td>{t.status}</td>
-                {type !== \"trade\" && (
-                  <td style={{ display: \"flex\", gap: 6 }}>
-                    {t.status === \"pending\" && (
-                      <>
-                        <button className=\"bnnc-btn bnnc-btn-green\" style={{ padding: \"4px 10px\", fontSize: 12 }} onClick={() => approve(t.id)} data-testid={`approve-${t.id}`}>Approve</button>
-                        <button className=\"bnnc-btn bnnc-btn-red\" style={{ padding: \"4px 10px\", fontSize: 12 }} onClick={() => reject(t.id)} data-testid={`reject-${t.id}`}>Reject</button>
-                      </>
-                    )}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+    </div>
   );
 }
 
-function QrTab() {
-  const [list, setList] = useState([]);
-  const [currency, setCurrency] = useState(\"USDT\");
-  const [preview, setPreview] = useState(\"\");
-  const inputRef = useRef(null);
+function Withdrawals() {
+  const [rows, setRows] = useState([]);
+  useEffect(() => { api.get(\"/admin/withdrawals\").then(r => setRows(r.data)); }, []);
+  return (
+    <div className=\"panel\" data-testid=\"admin-withdrawals\">
+      <div style={{overflowX:\"auto\"}}>
+      <table className=\"tbl\">
+        <thead><tr><th>Time</th><th>User</th><th>Currency</th><th>Amount</th><th>Fee</th><th>Address</th><th>Status</th></tr></thead>
+        <tbody>
+          {rows.map(d => (
+            <tr key={d.id}>
+              <td style={{fontSize:12}}>{new Date(d.created_at).toLocaleString()}</td>
+              <td><div>{d.username}</div><div className=\"text-dim\" style={{fontSize:11}}>{d.email}</div></td>
+              <td>{d.currency}</td>
+              <td>{d.amount}</td>
+              <td>{d.fee}</td>
+              <td style={{fontSize:11}}>{d.address}</td>
+              <td>{d.status === \"pending\" ? <span className=\"pill pending\">Pending</span> : d.status === \"paid\" ? <span className=\"pill paid\">Paid</span> : <span className=\"pill rejected\">{d.status}</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  );
+}
 
-  const load = async () => {
-    const { data } = await client.get(\"/admin/qr\");
-    setList(data.qr_codes || []);
-  };
+function Wallets() {
+  const [rows, setRows] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [address, setAddress] = useState(\"\");
+  const [network, setNetwork] = useState(\"\");
+  const [qrFile, setQrFile] = useState(\"\");
+  const [msg, setMsg] = useState(\"\");
+
+  const load = () => api.get(\"/wallets\").then(r => setRows(r.data));
   useEffect(() => { load(); }, []);
 
+  const startEdit = (w) => { setEditing(w.currency); setAddress(w.address); setNetwork(w.network||\"\"); setQrFile(w.qr_image_b64||\"\"); setMsg(\"\"); };
   const onFile = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setPreview(reader.result);
-    reader.readAsDataURL(file);
+    const f = e.target.files?.[0]; if (!f) return;
+    const r = new FileReader(); r.onload=()=>setQrFile(r.result); r.readAsDataURL(f);
   };
-
-  const upload = async () => {
-    if (!preview) return;
-    await client.post(\"/admin/qr/upload\", { currency, image_base64: preview });
-    setPreview(\"\");
-    if (inputRef.current) inputRef.current.value = \"\";
-    load();
+  const save = async () => {
+    try {
+      await api.put(\"/admin/wallets\", { currency: editing, address, network, qr_image_b64: qrFile });
+      setMsg(\"Saved\"); setEditing(null); load();
+    } catch (e) { setMsg(formatErr(e)); }
   };
 
   return (
-    <div style={{ display: \"grid\", gridTemplateColumns: \"1fr 1fr\", gap: 20 }}>
-      <div className=\"bnnc-card\" style={{ padding: 20 }}>
-        <h3 style={{ marginTop: 0 }}>QR yüklə</h3>
-        <label style={{ fontSize: 12, color: \"var(--bnnc-text-dim)\" }}>Currency</label>
-        <select className=\"bnnc-input\" value={currency} onChange={(e)=>setCurrency(e.target.value)} style={{ marginTop: 6, marginBottom: 14 }} data-testid=\"qr-currency\">
-          {[\"USDT\",\"BTC\",\"ETH\",\"TRX\",\"BNB\"].map(c=><option key={c} value={c}>{c}</option>)}
-        </select>
-        <input ref={inputRef} type=\"file\" accept=\"image/*\" onChange={onFile} style={{ marginBottom: 14 }} data-testid=\"qr-file\"/>
-        {preview && <img src={preview} alt=\"preview\" style={{ width: 160, height: 160, marginBottom: 14, background: \"white\", borderRadius: 8, padding: 8 }}/>}
-        <button className=\"bnnc-btn\" onClick={upload} disabled={!preview} data-testid=\"qr-upload\">Upload</button>
-      </div>
-      <div className=\"bnnc-card\" style={{ padding: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Mövcud QR-lər</h3>
-        <div style={{ display: \"grid\", gridTemplateColumns: \"repeat(3, 1fr)\", gap: 12 }}>
-          {list.map((q) => (
-            <div key={q.currency} style={{ textAlign: \"center\" }}>
-              <img src={q.image_base64} alt={q.currency} style={{ width: 100, height: 100, background: \"white\", borderRadius: 6, padding: 4 }}/>
-              <div style={{ fontSize: 12, marginTop: 4 }}>{q.currency}</div>
+    <div className=\"panel\" style={{padding:20}} data-testid=\"admin-wallets\">
+      {msg && <div style={{marginBottom:10, fontSize:13}} className=\"text-yellow\">{msg}</div>}
+      {SUPPORTED_CRYPTOS.map(c => {
+        const w = rows.find(x => x.currency === c) || { currency: c, address: \"\", network: c, qr_image_b64: \"\" };
+        const isEditing = editing === c;
+        return (
+          <div key={c} className=\"panel\" style={{padding:16, marginBottom:12, background:\"#0f1319\"}}>
+            <div style={{display:\"flex\", justifyContent:\"space-between\", alignItems:\"center\", marginBottom:10}}>
+              <div style={{fontWeight:700, fontSize:18}}>{c}</div>
+              {!isEditing && <button className=\"btn btn-ghost btn-sm\" onClick={()=>startEdit(w)} data-testid={`edit-wallet-${c}`}>Edit</button>}
             </div>
-          ))}
-          {list.length === 0 && <div style={{ color: \"var(--bnnc-text-dim)\", fontSize: 13 }}>Heç bir QR yüklənməyib (default avtomatik generasiya edilir)</div>}
-        </div>
-      </div>
+            {!isEditing ? (
+              <div style={{display:\"flex\", gap:14, alignItems:\"center\"}}>
+                {w.qr_image_b64 && <img src={w.qr_image_b64} alt=\"qr\" style={{width:80, height:80, background:\"#fff\", padding:4, borderRadius:6}}/>}
+                <div style={{flex:1}}>
+                  <div className=\"text-dim\" style={{fontSize:12}}>Network: {w.network || \"—\"}</div>
+                  <div style={{fontSize:13, wordBreak:\"break-all\"}}>{w.address || <span className=\"text-dim\">not set</span>}</div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className=\"lbl\">Address</label>
+                <input className=\"input\" value={address} onChange={e=>setAddress(e.target.value)} data-testid={`wallet-addr-${c}`}/>
+                <div style={{height:8}}/>
+                <label className=\"lbl\">Network</label>
+                <input className=\"input\" value={network} onChange={e=>setNetwork(e.target.value)}/>
+                <div style={{height:8}}/>
+                <label className=\"lbl\">QR Image (upload, optional)</label>
+                <input type=\"file\" accept=\"image/*\" onChange={onFile} data-testid={`wallet-qr-${c}`}/>
+                {qrFile && <img src={qrFile} alt=\"qr\" style={{maxWidth:140, marginTop:8, borderRadius:6, background:\"#fff\", padding:4}}/>}
+                <div style={{display:\"flex\", gap:8, marginTop:12}}>
+                  <button className=\"btn btn-ghost btn-sm\" onClick={()=>setEditing(null)}>Cancel</button>
+                  <button className=\"btn btn-primary btn-sm\" onClick={save} data-testid={`save-wallet-${c}`}>Save</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function CreateAdminTab() {
-  const [email, setEmail] = useState(\"\");
-  const [username, setUsername] = useState(\"\");
-  const [password, setPassword] = useState(\"\");
-  const [msg, setMsg] = useState(\"\");
-  const [err, setErr] = useState(\"\");
+function NewAdmin() {
+  const [email,setEmail] = useState(\"\"); const [username,setUsername]=useState(\"\"); const [password,setPassword]=useState(\"\");
+  const [msg,setMsg] = useState(\"\"); const [err,setErr]=useState(\"\");
   const submit = async (e) => {
-    e.preventDefault();
-    setMsg(\"\"); setErr(\"\");
+    e.preventDefault(); setMsg(\"\"); setErr(\"\");
     try {
-      await client.post(\"/admin/create-admin\", { email, username, password });
-      setMsg(\"✓ Yeni admin yaradıldı\");
-      setEmail(\"\"); setUsername(\"\"); setPassword(\"\");
-    } catch (e) { setErr(formatError(e)); }
+      await api.post(\"/admin/create\", { email, username, password });
+      setMsg(\"Admin created\"); setEmail(\"\"); setUsername(\"\"); setPassword(\"\");
+    } catch (e2) { setErr(formatErr(e2)); }
   };
   return (
-    <div className=\"bnnc-card\" style={{ padding: 24, maxWidth: 460 }}>
-      <h3 style={{ marginTop: 0 }}>Yeni Admin yarat</h3>
-      <form onSubmit={submit}>
-        <input className=\"bnnc-input\" placeholder=\"Email\" type=\"email\" value={email} onChange={(e)=>setEmail(e.target.value)} required style={{ marginBottom: 12 }} data-testid=\"new-admin-email\"/>
-        <input className=\"bnnc-input\" placeholder=\"Username\" value={username} onChange={(e)=>setUsername(e.target.value)} required style={{ marginBottom: 12 }} data-testid=\"new-admin-username\"/>
-        <input className=\"bnnc-input\" placeholder=\"Strong Password\" type=\"password\" value={password} onChange={(e)=>setPassword(e.target.value)} required style={{ marginBottom: 12 }} data-testid=\"new-admin-password\"/>
-        {err && <div className=\"text-down\" style={{ fontSize: 13, marginBottom: 10 }}>{err}</div>}
-        {msg && <div className=\"text-up\" style={{ fontSize: 13, marginBottom: 10 }}>{msg}</div>}
-        <button className=\"bnnc-btn\" type=\"submit\" data-testid=\"new-admin-submit\">Yarat</button>
-      </form>
-    </div>
+    <form className=\"panel\" style={{padding:24, maxWidth:480}} onSubmit={submit} data-testid=\"admin-new-form\">
+      <label className=\"lbl\">Email</label>
+      <input className=\"input\" type=\"email\" value={email} onChange={e=>setEmail(e.target.value)} required data-testid=\"new-admin-email\"/>
+      <div style={{height:10}}/>
+      <label className=\"lbl\">Username</label>
+      <input className=\"input\" value={username} onChange={e=>setUsername(e.target.value)} required minLength={3} data-testid=\"new-admin-username\"/>
+      <div style={{height:10}}/>
+      <label className=\"lbl\">Password</label>
+      <input className=\"input\" type=\"password\" value={password} onChange={e=>setPassword(e.target.value)} required minLength={8} data-testid=\"new-admin-password\"/>
+      {msg && <div className=\"text-green\" style={{marginTop:10, fontSize:13}}>{msg}</div>}
+      {err && <div className=\"text-red\" style={{marginTop:10, fontSize:13}}>{err}</div>}
+      <button className=\"btn btn-primary\" style={{marginTop:14, width:\"100%\"}} type=\"submit\" data-testid=\"new-admin-submit\">Create Admin</button>
+    </form>
   );
 }
 "
-Observation: Create successful: /app/frontend/src/Admin.jsx
+Observation: Create successful: /app/frontend/src/pages/Admin.jsx
