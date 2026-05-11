@@ -1,0 +1,13 @@
+
+Action: file_editor create /app/.gitignore --file-text "node_modules/
+build/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+.venv/
+venv/
+.pytest_cache/
+yarn-error.log
+"
+Observation: Overwrite successful: /app/.gitignore
