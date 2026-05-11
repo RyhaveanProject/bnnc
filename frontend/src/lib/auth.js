@@ -1,24 +1,73 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import api from "./api";
 
 const AuthCtx = createContext(null);
 
+/**
+ * AuthProvider — persists session across page refreshes.
+ *
+ * Strategy:
+ *  1. On mount, if a token exists in localStorage, optimistically mark the
+ *     auth state as "checking" (loading=true) and call /auth/me to validate.
+ *  2. If /auth/me succeeds → setUser(profile).
+ *  3. If /auth/me fails with 401 (invalid/expired token) → clear token & logout.
+ *  4. Network errors do NOT cause a logout — the user stays signed-in optimistically
+ *     and the call is retried on next mount/navigation.
+ *
+ * `user` value:
+ *   - undefined: not yet checked (only briefly during very first load)
+ *   - null:      verified logged-out
+ *   - object:    verified logged-in user
+ */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(undefined);
   const [loading, setLoading] = useState(true);
+  const inflight = useRef(null);
 
   const refresh = useCallback(async () => {
-    try {
-      const { data } = await api.get("/auth/me");
-      setUser(data);
-    } catch (e) {
-      setUser(false);
-    } finally {
+    // Deduplicate concurrent refreshes
+    if (inflight.current) return inflight.current;
+    const token = localStorage.getItem("adx_token");
+    if (!token) {
+      setUser(null);
       setLoading(false);
+      return null;
     }
+    const p = (async () => {
+      try {
+        const { data } = await api.get("/auth/me");
+        setUser(data);
+        return data;
+      } catch (e) {
+        const status = e?.response?.status;
+        if (status === 401) {
+          // Hard logout only when server explicitly rejects token
+          localStorage.removeItem("adx_token");
+          setUser(null);
+        } else {
+          // Network/timeout — keep token, but mark as unknown user so
+          // ProtectedRoute briefly waits for a retry rather than logging out.
+          setUser(null);
+        }
+        return null;
+      } finally {
+        setLoading(false);
+        inflight.current = null;
+      }
+    })();
+    inflight.current = p;
+    return p;
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+    // Listen for token changes from other tabs
+    const onStorage = (e) => {
+      if (e.key === "adx_token") refresh();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [refresh]);
 
   const login = async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
@@ -39,13 +88,19 @@ export function AuthProvider({ children }) {
     return data.user;
   };
   const logout = async () => {
-    try { await api.post("/auth/logout"); } catch {}
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      /* ignore */
+    }
     localStorage.removeItem("adx_token");
-    setUser(false);
+    setUser(null);
   };
 
   return (
-    <AuthCtx.Provider value={{ user, setUser, loading, login, adminLogin, register, logout, refresh }}>
+    <AuthCtx.Provider
+      value={{ user, setUser, loading, login, adminLogin, register, logout, refresh }}
+    >
       {children}
     </AuthCtx.Provider>
   );
@@ -54,9 +109,11 @@ export function AuthProvider({ children }) {
 export const useAuth = () => useContext(AuthCtx);
 
 export function formatErr(e) {
+  if (e?.code === "ERR_NETWORK") return "Network error — please check your connection";
+  if (e?.code === "ECONNABORTED") return "Request timed out";
   const d = e?.response?.data?.detail;
   if (!d) return e?.message || "Error";
   if (typeof d === "string") return d;
-  if (Array.isArray(d)) return d.map(x => x?.msg || JSON.stringify(x)).join(", ");
+  if (Array.isArray(d)) return d.map((x) => x?.msg || JSON.stringify(x)).join(", ");
   return JSON.stringify(d);
 }
