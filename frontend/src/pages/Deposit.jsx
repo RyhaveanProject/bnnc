@@ -146,8 +146,17 @@ export default function Deposit() {
   };
 
   const onSubmitReceipt = async () => {
-    if (!deposit || !receiptFile) {
-      setErr("Please upload the receipt screenshot first");
+    if (!deposit) return;
+    if (!receiptFile) {
+      setErr("Receipt is required. Please upload your payment screenshot before continuing.");
+      return;
+    }
+    if (!ALLOWED_TYPES.includes(receiptFile.type)) {
+      setErr("Only image files (JPEG, PNG, WEBP, GIF) are allowed");
+      return;
+    }
+    if (receiptFile.size > MAX_FILE_BYTES) {
+      setErr(`File too large (max ${MAX_FILE_BYTES / 1024 / 1024} MB)`);
       return;
     }
     setErr("");
@@ -167,7 +176,7 @@ export default function Deposit() {
           },
         }
       );
-      setMsg("Receipt submitted successfully. Pending admin approval.");
+      setMsg("Receipt submitted successfully. Pending approval.");
       setDeposit(null);
       setReceiptFile(null);
       setReceiptPreview("");
@@ -346,14 +355,29 @@ export default function Deposit() {
                 <SummaryRow label="Status" value={<StatusPill s={deposit.status} />} testid="dep-sum-status" />
               </div>
 
-              <label className="lbl">Upload payment receipt screenshot</label>
+              <label className="lbl" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                Upload payment receipt screenshot
+                <span style={{ color: "#ff6b6b", fontWeight: 700 }} aria-hidden="true">*</span>
+                <span style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 400 }}>(required)</span>
+              </label>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
                 onChange={onPickFile}
+                required
+                aria-required="true"
                 data-testid="dep-receipt-file"
               />
+              {!receiptFile && (
+                <div
+                  className="text-dim"
+                  style={{ marginTop: 6, fontSize: 12 }}
+                  data-testid="dep-receipt-hint"
+                >
+                  A receipt screenshot is required to continue. Supported: JPEG, PNG, WEBP, GIF (max 8 MB).
+                </div>
+              )}
               {receiptPreview && (
                 <img
                   src={receiptPreview}
@@ -392,6 +416,7 @@ export default function Deposit() {
                   className="btn btn-primary"
                   onClick={onSubmitReceipt}
                   disabled={busy || !receiptFile}
+                  title={!receiptFile ? "Please upload your payment receipt to continue" : undefined}
                   data-testid="dep-submit-receipt"
                 >
                   {busy ? <span className="spinner" /> : "Continue"}
