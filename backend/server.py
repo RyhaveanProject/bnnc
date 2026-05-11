@@ -470,6 +470,32 @@ async def market_prices():
     return await _refresh_market_cache()
 
 
+async def _live_price(symbol: str) -> float:
+    """Return real-time USD price for a supported currency.
+    USDT = 1.0. For BTC/ETH/TRX/BNB uses KuCoin cached prices.
+    Falls back to STATIC_FALLBACK if everything fails.
+    """
+    symbol = symbol.upper()
+    if symbol == "USDT":
+        return 1.0
+    try:
+        prices = await market_prices()
+        for p in prices:
+            if p["symbol"] == symbol:
+                price = float(p.get("price") or 0)
+                if price > 0:
+                    return price
+    except Exception as e:
+        logger.warning("live price lookup failed for %s: %s", symbol, e)
+    return float(STATIC_FALLBACK.get(symbol, 0.0))
+
+
+async def _deposit_usd_value(currency: str, amount: float) -> float:
+    """Convert a deposit amount in `currency` to its USD (USDT) value at live rates."""
+    price = await _live_price(currency)
+    return float(amount) * price
+
+
 # ============ WALLETS ============
 @api.get("/wallets")
 async def get_wallets():
@@ -543,12 +569,16 @@ async def notify_deposit(deposit: dict, user: dict, receipt_bytes: Optional[byte
     chat_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
     if not chat_id:
         return
+    # Compute live USD value at notification time so admin sees what will be
+    # credited if confirmed. Final crediting also re-evaluates the price.
+    usd_value = await _deposit_usd_value(deposit["currency"], float(deposit["amount"]))
     caption = (
         f"💰 *New Deposit Request*\n"
         f"👤 User: `{user['username']}`\n"
         f"📧 Email: `{user['email']}`\n"
         f"💎 Token: *{deposit['currency']}*\n"
         f"💵 Amount: *{deposit['amount']} {deposit['currency']}*\n"
+        f"💲 USD value: *≈ ${usd_value:,.2f}*\n"
         f"🏦 Wallet: `{deposit.get('wallet_address','-')}`\n"
         f"🌐 Network: {deposit.get('network','-')}\n"
         f"📅 Date: {deposit['created_at']}\n"
@@ -621,22 +651,41 @@ async def telegram_webhook(request: Request):
         if dep["status"] == "rejected":
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Already rejected"})
             return {"ok": True}
-        await db.deposits.update_one(
+        # Convert deposit amount to USD (USDT) at live market rate.
+        # ALL approved deposits credit the user's USDT balance.
+        usd_value = await _deposit_usd_value(dep["currency"], float(dep["amount"]))
+        # Atomic status flip prevents double-credit on rapid double-clicks.
+        flip = await db.deposits.update_one(
             {"id": target_id, "status": {"$in": ["pending", "awaiting_review"]}},
-            {"$set": {"status": "completed", "approved_at": now_iso()}},
+            {"$set": {
+                "status": "completed",
+                "approved_at": now_iso(),
+                "credited_usd": usd_value,
+                "credited_currency": "USDT",
+                "price_at_approval": usd_value / float(dep["amount"]) if float(dep["amount"]) else 0,
+            }},
         )
+        if flip.modified_count == 0:
+            await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Already processed"})
+            return {"ok": True}
         await db.users.update_one(
             {"id": dep["user_id"]},
-            {"$inc": {f"balances.{dep['currency']}": float(dep["amount"])}},
+            {"$inc": {"balances.USDT": float(usd_value)}},
         )
-        await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Deposit confirmed ✅"})
+        await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": f"Confirmed: +${usd_value:,.2f} USDT ✅"})
         if msg_id:
             await tg_send("editMessageReplyMarkup", {
                 "chat_id": msg_chat_id, "message_id": msg_id,
-                "reply_markup": {"inline_keyboard": [[{"text": "✅ CONFIRMED", "callback_data": "noop"}]]},
+                "reply_markup": {"inline_keyboard": [[{"text": f"✅ CONFIRMED  +${usd_value:,.2f}", "callback_data": "noop"}]]},
             })
     elif op == "rdep":
-        await db.deposits.update_one({"id": target_id}, {"$set": {"status": "rejected", "approved_at": now_iso()}})
+        flip = await db.deposits.update_one(
+            {"id": target_id, "status": {"$in": ["pending", "awaiting_review"]}},
+            {"$set": {"status": "rejected", "approved_at": now_iso(), "rejected_reason": "admin_cancelled"}},
+        )
+        if flip.modified_count == 0:
+            await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Already processed"})
+            return {"ok": True}
         await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Deposit cancelled ❌"})
         if msg_id:
             await tg_send("editMessageReplyMarkup", {
@@ -1046,12 +1095,22 @@ async def admin_approve_deposit(dep_id: str, admin: dict = Depends(require_admin
         raise HTTPException(status_code=404, detail="Not found")
     if dep["status"] in ("approved", "completed"):
         return {"ok": True, "status": dep["status"]}
-    await db.deposits.update_one({"id": dep_id}, {"$set": {"status": "completed", "approved_at": now_iso()}})
+    usd_value = await _deposit_usd_value(dep["currency"], float(dep["amount"]))
+    flip = await db.deposits.update_one(
+        {"id": dep_id, "status": {"$in": ["pending", "awaiting_review"]}},
+        {"$set": {
+            "status": "completed", "approved_at": now_iso(),
+            "credited_usd": usd_value, "credited_currency": "USDT",
+            "price_at_approval": usd_value / float(dep["amount"]) if float(dep["amount"]) else 0,
+        }},
+    )
+    if flip.modified_count == 0:
+        return {"ok": True, "status": "already_processed"}
     await db.users.update_one(
         {"id": dep["user_id"]},
-        {"$inc": {f"balances.{dep['currency']}": float(dep["amount"])}},
+        {"$inc": {"balances.USDT": float(usd_value)}},
     )
-    return {"ok": True, "status": "completed"}
+    return {"ok": True, "status": "completed", "credited_usd": usd_value}
 
 
 @api.post("/admin/deposits/{dep_id}/reject")
