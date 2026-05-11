@@ -554,11 +554,15 @@ async def _register_telegram_webhook():
         return
     base = base.rstrip("/")
     webhook_url = f"{base}/api/telegram/webhook"
+    secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "").strip()
     try:
         async with httpx.AsyncClient(timeout=15) as cli:
+            payload = {"url": webhook_url, "allowed_updates": ["callback_query", "message"]}
+            if secret:
+                payload["secret_token"] = secret
             r = await cli.post(
                 f"https://api.telegram.org/bot{token}/setWebhook",
-                json={"url": webhook_url, "allowed_updates": ["callback_query", "message"]},
+                json=payload,
             )
             logger.info("Telegram setWebhook %s -> %s", webhook_url, r.status_code)
     except Exception as e:
@@ -625,6 +629,12 @@ async def notify_withdraw(w: dict, user: dict):
 
 @api.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
+    # Verify Telegram secret token header if configured (defense in depth)
+    expected_secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    if expected_secret:
+        got = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if got != expected_secret:
+            raise HTTPException(status_code=403, detail="Forbidden")
     body = await request.json()
     cb = body.get("callback_query")
     if not cb:
