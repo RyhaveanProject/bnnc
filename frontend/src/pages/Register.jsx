@@ -1,85 +1,79 @@
 
 Action: file_editor create /app/frontend/src/pages/Register.jsx --file-text "import React, { useState } from \"react\";
 import { Link, useNavigate } from \"react-router-dom\";
-import { useAuth } from \"@/context/AuthContext\";
-import { toast } from \"sonner\";
-import { ArrowLeft } from \"lucide-react\";
-
-function formatErr(detail) {
-  if (!detail) return \"Something went wrong\";
-  if (typeof detail === \"string\") return detail;
-  if (Array.isArray(detail)) return detail.map(e => e?.msg || JSON.stringify(e)).join(\" · \");
-  return String(detail);
-}
+import { useAuth, formatErr } from \"../lib/auth\";
 
 export default function Register() {
   const { register } = useAuth();
-  const nav = useNavigate();
-  const [name, setName] = useState(\"\");
   const [email, setEmail] = useState(\"\");
+  const [username, setUsername] = useState(\"\");
   const [password, setPassword] = useState(\"\");
+  const [confirm, setConfirm] = useState(\"\");
+  const [err, setErr] = useState(\"\");
   const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState(\"\"); // \"wait\" | \"done\"
+  const nav = useNavigate();
 
-  const submit = async (e) => {
+  // Client-side: must be gmail-like (real email format, common providers OK)
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const strongPwd = password.length >= 8 && /[A-Za-z]/.test(password) && /\d/.test(password);
+
+  const onSubmit = async (e) => {
     e.preventDefault();
+    setErr(\"\");
+    if (!validEmail) return setErr(\"Please enter a valid email address.\");
+    if (!strongPwd) return setErr(\"Password must be 8+ chars and contain letters and numbers.\");
+    if (password !== confirm) return setErr(\"Passwords do not match.\");
     setLoading(true);
+    setPhase(\"wait\");
     try {
-      await register(email, password, name);
-      toast.success(\"Account created\");
-      nav(\"/dashboard\");
-    } catch (err) {
-      toast.error(formatErr(err.response?.data?.detail) || err.message);
+      await register(email, password, username);
+      setPhase(\"done\");
+      setTimeout(() => nav(\"/trade\"), 500);
+    } catch (e2) {
+      setErr(formatErr(e2));
+      setPhase(\"\");
     } finally { setLoading(false); }
   };
 
   return (
-    <div className=\"min-h-screen grid lg:grid-cols-2 bg-[#0B0F19] text-white\">
-      <div className=\"hidden lg:flex relative overflow-hidden grid-bg border-r border-[#1E293B]\">
-        <div className=\"relative z-10 p-12 flex flex-col justify-between\">
-          <Link to=\"/\" className=\"flex items-center gap-2.5\">
-            <div className=\"w-7 h-7 bg-[#007AFF] flex items-center justify-center rounded-sm\">
-              <span className=\"font-display font-bold text-white text-sm\">P</span>
-            </div>
-            <span className=\"font-display text-lg font-semibold tracking-tight\">PROCX</span>
-          </Link>
-          <div>
-            <div className=\"label-eyebrow mb-4\">Open an account</div>
-            <h2 className=\"font-display text-4xl font-semibold leading-tight max-w-md\">
-              Trade like the desks. Built for retail.
-            </h2>
-            <p className=\"mt-6 text-slate-400 max-w-md text-sm leading-relaxed\">
-              Free to open. Deposit USDT, BTC, ETH, TRX or BNB and start trading in minutes.
-            </p>
+    <div className=\"hero-bg\" style={{minHeight:\"calc(100vh - 60px)\", display:\"grid\", placeItems:\"center\", padding:24}} data-testid=\"register-page\">
+      <form onSubmit={onSubmit} className=\"panel\" style={{padding:32, width:\"100%\", maxWidth:460}}>
+        <div className=\"brand\" style={{textAlign:\"center\", marginBottom:6, fontSize:24}}>
+          <span className=\"b1\">ADX</span> <span style={{color:\"#fff\", fontWeight:600, fontSize:16, marginLeft:4}}>America</span>
+        </div>
+        <h2 style={{textAlign:\"center\", margin:\"0 0 20px\", fontSize:20}}>Create your account</h2>
+
+        <label className=\"lbl\">Username</label>
+        <input className=\"input\" value={username} onChange={e=>setUsername(e.target.value)} minLength={3} required data-testid=\"register-username\"/>
+        <div style={{height:12}}/>
+        <label className=\"lbl\">Email (real address required)</label>
+        <input className=\"input\" type=\"email\" value={email} onChange={e=>setEmail(e.target.value)} required data-testid=\"register-email\" autoComplete=\"email\"/>
+        <div style={{height:12}}/>
+        <label className=\"lbl\">Password (8+ chars, letters + numbers)</label>
+        <input className=\"input\" type=\"password\" value={password} onChange={e=>setPassword(e.target.value)} required data-testid=\"register-password\" autoComplete=\"new-password\"/>
+        <div style={{height:12}}/>
+        <label className=\"lbl\">Confirm password</label>
+        <input className=\"input\" type=\"password\" value={confirm} onChange={e=>setConfirm(e.target.value)} required data-testid=\"register-confirm\" autoComplete=\"new-password\"/>
+
+        {err && <div className=\"text-red\" style={{marginTop:12, fontSize:13}} data-testid=\"register-error\">{err}</div>}
+
+        {phase === \"wait\" && (
+          <div style={{marginTop:14, padding:12, borderRadius:8, background:\"rgba(240,185,11,.08)\", color:\"var(--yellow)\", display:\"flex\", alignItems:\"center\", gap:10, fontSize:13}} data-testid=\"register-wait\">
+            <span className=\"spinner\"/> Please wait 5 seconds, your account is being created…
           </div>
-          <div className=\"text-xs text-slate-600 font-mono\">NO-KYC · FAST.ONBOARDING</div>
+        )}
+
+        <button className=\"btn btn-primary\" style={{marginTop:18, width:\"100%\"}} type=\"submit\" disabled={loading} data-testid=\"register-submit\">
+          {loading ? <span className=\"spinner\"/> : \"Register\"}
+        </button>
+
+        <div style={{textAlign:\"center\", marginTop:14, fontSize:13}} className=\"text-dim\">
+          Already registered? <Link to=\"/login\" className=\"text-yellow\">Sign in</Link>
         </div>
-      </div>
-      <div className=\"flex items-center justify-center p-6 sm:p-12\">
-        <div className=\"w-full max-w-sm\">
-          <Link to=\"/\" className=\"text-slate-500 hover:text-white text-sm inline-flex items-center gap-1 mb-8\"><ArrowLeft className=\"w-3.5 h-3.5\" /> Back</Link>
-          <h1 className=\"font-display text-3xl font-semibold mb-2\">Create account</h1>
-          <p className=\"text-slate-400 text-sm mb-8\">Already have one? <Link to=\"/login\" className=\"text-[#007AFF] hover:underline\" data-testid=\"to-login\">Sign in</Link></p>
-          <form onSubmit={submit} className=\"space-y-4\">
-            <div>
-              <label className=\"label-eyebrow block mb-2\">Display name</label>
-              <input type=\"text\" value={name} onChange={e => setName(e.target.value)} className=\"input-dark\" placeholder=\"Jordan Trader\" data-testid=\"register-name\" />
-            </div>
-            <div>
-              <label className=\"label-eyebrow block mb-2\">Email</label>
-              <input type=\"email\" required value={email} onChange={e => setEmail(e.target.value)} className=\"input-dark font-mono\" placeholder=\"you@example.com\" data-testid=\"register-email\" />
-            </div>
-            <div>
-              <label className=\"label-eyebrow block mb-2\">Password</label>
-              <input type=\"password\" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} className=\"input-dark font-mono\" placeholder=\"At least 6 characters\" data-testid=\"register-password\" />
-            </div>
-            <button disabled={loading} className=\"btn-primary w-full\" data-testid=\"register-submit\">
-              {loading ? \"Creating…\" : \"Create account\"}
-            </button>
-          </form>
-        </div>
-      </div>
+      </form>
     </div>
   );
 }
 "
-Observation: Create successful: /app/frontend/src/pages/
+Observation: Create successful: /app/frontend/src/pages/Register.jsx
