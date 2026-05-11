@@ -17,8 +17,8 @@ import Admin from "./pages/Admin";
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
   const loc = useLocation();
-  if (loading) return <div style={{padding:60, textAlign:"center"}} className="text-dim">Loading…</div>;
-  if (!user) return <Navigate to={adminOnly ? "/admin/login" : "/login"} state={{ from: loc }} replace />;
+  if (loading) return <div style={{ padding: 60, textAlign: "center" }} className="text-dim">Loading…</div>;
+  if (!user) return <Navigate to="/login" state={{ from: loc }} replace />;
   if (adminOnly && user.role !== "admin") return <Navigate to="/" replace />;
   return children;
 }
@@ -32,7 +32,8 @@ function Shell() {
         <Route path="/markets" element={<Markets />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/admin/login" element={<Login adminMode />} />
+        {/* Legacy admin login URL → redirect to unified login (admin auto-detected) */}
+        <Route path="/admin/login" element={<Navigate to="/login" replace />} />
         <Route path="/trade" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
         <Route path="/deposit" element={<ProtectedRoute><Deposit /></ProtectedRoute>} />
         <Route path="/withdraw" element={<ProtectedRoute><Withdraw /></ProtectedRoute>} />
