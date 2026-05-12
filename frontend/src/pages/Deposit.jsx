@@ -1,21 +1,21 @@
-import React, { useEffect, useMemo, useState, useRef } from \"react\";
-import { QRCodeSVG } from \"qrcode.react\";
-import { useTranslation } from \"react-i18next\";
-import api, { SUPPORTED_CRYPTOS, COIN_NAMES } from \"../lib/api\";
-import { formatErr } from \"../lib/auth\";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { useTranslation } from "react-i18next";
+import api, { SUPPORTED_CRYPTOS, COIN_NAMES } from "../lib/api";
+import { formatErr } from "../lib/auth";
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const ALLOWED_TYPES = [\"image/jpeg\", \"image/jpg\", \"image/png\", \"image/webp\", \"image/gif\"];
+const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
 
 function StatusPill({ s }) {
   const { t } = useTranslation();
   const map = {
-    pending: { cls: \"pending\", label: t(\"status.pending\") },
-    completed: { cls: \"approved\", label: t(\"status.completed\") },
-    approved: { cls: \"approved\", label: t(\"status.completed\") },
-    rejected: { cls: \"rejected\", label: t(\"status.rejected\") },
+    pending: { cls: "pending", label: t("status.pending") },
+    completed: { cls: "approved", label: t("status.completed") },
+    approved: { cls: "approved", label: t("status.completed") },
+    rejected: { cls: "rejected", label: t("status.rejected") },
   };
-  const m = map[s] || { cls: \"\", label: s };
+  const m = map[s] || { cls: "", label: s };
   return <span className={`pill ${m.cls}`}>{m.label}</span>;
 }
 
@@ -26,16 +26,16 @@ function Countdown({ deadline, onExpire }) {
     return () => clearInterval(t);
   }, []);
   const remain = Math.max(0, Math.floor((deadline - now) / 1000));
-  const m = String(Math.floor(remain / 60)).padStart(2, \"0\");
-  const s = String(remain % 60).padStart(2, \"0\");
+  const m = String(Math.floor(remain / 60)).padStart(2, "0");
+  const s = String(remain % 60).padStart(2, "0");
   useEffect(() => {
-    if (remain === 0 && typeof onExpire === \"function\") onExpire();
+    if (remain === 0 && typeof onExpire === "function") onExpire();
   }, [remain, onExpire]);
   const danger = remain < 60;
   return (
     <div
-      data-testid=\"dep-countdown\"
-      style={{ fontWeight: 700, fontSize: 18, color: danger ? \"#ff6b6b\" : \"var(--text)\", fontVariantNumeric: \"tabular-nums\" }}
+      data-testid="dep-countdown"
+      style={{ fontWeight: 700, fontSize: 18, color: danger ? "#ff6b6b" : "var(--text)", fontVariantNumeric: "tabular-nums" }}
     >
       {m}:{s}
     </div>
@@ -45,24 +45,24 @@ function Countdown({ deadline, onExpire }) {
 export default function Deposit() {
   const { t } = useTranslation();
   const [wallets, setWallets] = useState([]);
-  const [currency, setCurrency] = useState(\"USDT\");
-  const [amount, setAmount] = useState(\"\");
+  const [currency, setCurrency] = useState("USDT");
+  const [amount, setAmount] = useState("");
   const [deposit, setDeposit] = useState(null);
   const [copied, setCopied] = useState(false);
   const [receiptFile, setReceiptFile] = useState(null);
-  const [receiptPreview, setReceiptPreview] = useState(\"\");
-  const [err, setErr] = useState(\"\");
-  const [msg, setMsg] = useState(\"\");
+  const [receiptPreview, setReceiptPreview] = useState("");
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [history, setHistory] = useState([]);
   const fileInputRef = useRef(null);
 
   const loadWallets = async () => {
-    try { const { data } = await api.get(\"/wallets\"); setWallets(data || []); } catch { /* */ }
+    try { const { data } = await api.get("/wallets"); setWallets(data || []); } catch { /* */ }
   };
   const loadHistory = async () => {
-    try { const { data } = await api.get(\"/deposits/me\"); setHistory(data || []); } catch { /* */ }
+    try { const { data } = await api.get("/deposits/me"); setHistory(data || []); } catch { /* */ }
   };
   useEffect(() => {
     loadWallets(); loadHistory();
@@ -74,14 +74,14 @@ export default function Deposit() {
 
   const onCreate = async (e) => {
     e.preventDefault();
-    setErr(\"\"); setMsg(\"\");
+    setErr(""); setMsg("");
     const amt = parseFloat(amount);
-    if (!amt || amt <= 0) { setErr(t(\"deposit.valid_amount\")); return; }
-    if (!wallet?.address) { setErr(t(\"deposit.wallet_not_configured_currency\")); return; }
+    if (!amt || amt <= 0) { setErr(t("deposit.valid_amount")); return; }
+    if (!wallet?.address) { setErr(t("deposit.wallet_not_configured_currency")); return; }
     setBusy(true);
     try {
-      const { data } = await api.post(\"/deposits/create\", { currency, amount: amt });
-      setDeposit(data.deposit); setReceiptFile(null); setReceiptPreview(\"\");
+      const { data } = await api.post("/deposits/create", { currency, amount: amt });
+      setDeposit(data.deposit); setReceiptFile(null); setReceiptPreview("");
     } catch (e2) { setErr(formatErr(e2)); }
     finally { setBusy(false); }
   };
@@ -96,9 +96,9 @@ export default function Deposit() {
   const onPickFile = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    setErr(\"\");
-    if (!ALLOWED_TYPES.includes(f.type)) { setErr(t(\"deposit.only_images\")); e.target.value = \"\"; return; }
-    if (f.size > MAX_FILE_BYTES) { setErr(t(\"deposit.file_too_large\", { mb: MAX_FILE_BYTES / 1024 / 1024 })); e.target.value = \"\"; return; }
+    setErr("");
+    if (!ALLOWED_TYPES.includes(f.type)) { setErr(t("deposit.only_images")); e.target.value = ""; return; }
+    if (f.size > MAX_FILE_BYTES) { setErr(t("deposit.file_too_large", { mb: MAX_FILE_BYTES / 1024 / 1024 })); e.target.value = ""; return; }
     setReceiptFile(f);
     const reader = new FileReader();
     reader.onload = () => setReceiptPreview(reader.result);
@@ -107,20 +107,20 @@ export default function Deposit() {
 
   const onSubmitReceipt = async () => {
     if (!deposit) return;
-    if (!receiptFile) { setErr(t(\"deposit.receipt_required\")); return; }
-    if (!ALLOWED_TYPES.includes(receiptFile.type)) { setErr(t(\"deposit.only_images\")); return; }
-    if (receiptFile.size > MAX_FILE_BYTES) { setErr(t(\"deposit.file_too_large\", { mb: MAX_FILE_BYTES / 1024 / 1024 })); return; }
-    setErr(\"\"); setMsg(\"\"); setBusy(true); setUploadProgress(0);
+    if (!receiptFile) { setErr(t("deposit.receipt_required")); return; }
+    if (!ALLOWED_TYPES.includes(receiptFile.type)) { setErr(t("deposit.only_images")); return; }
+    if (receiptFile.size > MAX_FILE_BYTES) { setErr(t("deposit.file_too_large", { mb: MAX_FILE_BYTES / 1024 / 1024 })); return; }
+    setErr(""); setMsg(""); setBusy(true); setUploadProgress(0);
     try {
       const fd = new FormData();
-      fd.append(\"file\", receiptFile);
+      fd.append("file", receiptFile);
       const { data } = await api.post(`/deposits/${deposit.id}/upload-receipt`, fd, {
-        headers: { \"Content-Type\": \"multipart/form-data\" },
+        headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => { if (e.total) setUploadProgress(Math.round((e.loaded * 100) / e.total)); },
       });
-      setMsg(t(\"deposit.receipt_submitted\"));
-      setDeposit(null); setReceiptFile(null); setReceiptPreview(\"\"); setAmount(\"\"); setUploadProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = \"\";
+      setMsg(t("deposit.receipt_submitted"));
+      setDeposit(null); setReceiptFile(null); setReceiptPreview(""); setAmount(""); setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       if (data?.deposit) setHistory((h) => [data.deposit, ...h.filter((x) => x.id !== data.deposit.id)]);
       await loadHistory();
     } catch (e2) { setErr(formatErr(e2)); setUploadProgress(0); }
@@ -128,8 +128,8 @@ export default function Deposit() {
   };
 
   const cancelDeposit = () => {
-    setDeposit(null); setReceiptFile(null); setReceiptPreview(\"\"); setErr(\"\"); setMsg(\"\");
-    if (fileInputRef.current) fileInputRef.current.value = \"\";
+    setDeposit(null); setReceiptFile(null); setReceiptPreview(""); setErr(""); setMsg("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const deadlineMs = useMemo(() => {
@@ -138,139 +138,139 @@ export default function Deposit() {
   }, [deposit]);
 
   const onCountdownExpire = () => {
-    setErr(t(\"deposit.expired\"));
-    setDeposit(null); setReceiptFile(null); setReceiptPreview(\"\");
+    setErr(t("deposit.expired"));
+    setDeposit(null); setReceiptFile(null); setReceiptPreview("");
     loadHistory();
   };
 
   return (
-    <div data-testid=\"deposit-page\" style={{ maxWidth: 1100, margin: \"0 auto\", padding: 24 }} className=\"container-pad\">
-      <h1 style={{ margin: \"0 0 24px\" }}>{t(\"deposit.title\")}</h1>
-      <div style={{ display: \"grid\", gridTemplateColumns: \"1fr 1fr\", gap: 20 }} className=\"dep-grid\">
-        <div className=\"panel\" style={{ padding: 24 }}>
+    <div data-testid="deposit-page" style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }} className="container-pad">
+      <h1 style={{ margin: "0 0 24px" }}>{t("deposit.title")}</h1>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }} className="dep-grid">
+        <div className="panel" style={{ padding: 24 }}>
           {!deposit ? (
             <>
-              <div className=\"lbl\">{t(\"deposit.select_token\")}</div>
-              <div style={{ display: \"flex\", gap: 8, flexWrap: \"wrap\", marginBottom: 16 }}>
+              <div className="lbl">{t("deposit.select_token")}</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
                 {SUPPORTED_CRYPTOS.map((c) => (
-                  <button key={c} type=\"button\" onClick={() => setCurrency(c)} data-testid={`dep-coin-${c}`}
-                    className={`btn btn-sm ${currency === c ? \"btn-primary\" : \"btn-ghost\"}`}>{c}</button>
+                  <button key={c} type="button" onClick={() => setCurrency(c)} data-testid={`dep-coin-${c}`}
+                    className={`btn btn-sm ${currency === c ? "btn-primary" : "btn-ghost"}`}>{c}</button>
                 ))}
               </div>
               <form onSubmit={onCreate}>
-                <label className=\"lbl\">{t(\"deposit.amount\", { currency })}</label>
-                <input className=\"input\" type=\"number\" step=\"any\" min=\"0\" value={amount} onChange={(e) => setAmount(e.target.value)} required data-testid=\"dep-amount\"/>
+                <label className="lbl">{t("deposit.amount", { currency })}</label>
+                <input className="input" type="number" step="any" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} required data-testid="dep-amount"/>
                 <div style={{ height: 14 }} />
-                <label className=\"lbl\">{t(\"deposit.wallet_address\", { network: wallet?.network || currency })}</label>
-                <div style={{ display: \"flex\", gap: 8 }}>
-                  <input className=\"input\" value={wallet?.address || \"\"} readOnly data-testid=\"dep-wallet\"/>
-                  <button type=\"button\" className=\"btn btn-ghost btn-sm\" onClick={copy} data-testid=\"dep-copy\">
-                    {copied ? t(\"common.copied\") : t(\"common.copy\")}
+                <label className="lbl">{t("deposit.wallet_address", { network: wallet?.network || currency })}</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input className="input" value={wallet?.address || ""} readOnly data-testid="dep-wallet"/>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={copy} data-testid="dep-copy">
+                    {copied ? t("common.copied") : t("common.copy")}
                   </button>
                 </div>
-                <div style={{ marginTop: 18, display: \"flex\", justifyContent: \"center\" }}>
+                <div style={{ marginTop: 18, display: "flex", justifyContent: "center" }}>
                   {wallet?.qr_image_b64 ? (
-                    <img src={wallet.qr_image_b64} alt=\"qr\"
-                      style={{ width: 180, height: 180, background: \"#fff\", padding: 6, borderRadius: 8 }}
-                      data-testid=\"dep-qr-img\"/>
+                    <img src={wallet.qr_image_b64} alt="qr"
+                      style={{ width: 180, height: 180, background: "#fff", padding: 6, borderRadius: 8 }}
+                      data-testid="dep-qr-img"/>
                   ) : wallet?.address ? (
-                    <div style={{ background: \"#fff\", padding: 10, borderRadius: 8 }} data-testid=\"dep-qr-gen\">
+                    <div style={{ background: "#fff", padding: 10, borderRadius: 8 }} data-testid="dep-qr-gen">
                       <QRCodeSVG value={wallet.address} size={180} />
                     </div>
                   ) : (
-                    <div className=\"text-dim\">{t(\"deposit.wallet_not_configured\")}</div>
+                    <div className="text-dim">{t("deposit.wallet_not_configured")}</div>
                   )}
                 </div>
-                {err && <div className=\"text-red\" style={{ marginTop: 12, fontSize: 13 }} data-testid=\"dep-err\">{err}</div>}
-                {msg && <div className=\"text-green\" style={{ marginTop: 10, fontSize: 13 }} data-testid=\"dep-msg\">{msg}</div>}
-                <button type=\"submit\" className=\"btn btn-primary\" style={{ marginTop: 18, width: \"100%\" }}
-                  disabled={busy || !wallet?.address} data-testid=\"dep-create\">
-                  {busy ? <span className=\"spinner\" /> : t(\"deposit.continue\")}
+                {err && <div className="text-red" style={{ marginTop: 12, fontSize: 13 }} data-testid="dep-err">{err}</div>}
+                {msg && <div className="text-green" style={{ marginTop: 10, fontSize: 13 }} data-testid="dep-msg">{msg}</div>}
+                <button type="submit" className="btn btn-primary" style={{ marginTop: 18, width: "100%" }}
+                  disabled={busy || !wallet?.address} data-testid="dep-create">
+                  {busy ? <span className="spinner" /> : t("deposit.continue")}
                 </button>
               </form>
             </>
           ) : (
-            <div data-testid=\"dep-receipt-step\">
-              <div style={{ display:\"flex\", justifyContent:\"space-between\", alignItems:\"center\", marginBottom: 14, padding: 12,
-                background: \"rgba(255, 200, 0, 0.08)\", border: \"1px solid rgba(255, 200, 0, 0.3)\", borderRadius: 8 }}>
+            <div data-testid="dep-receipt-step">
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 14, padding: 12,
+                background: "rgba(255, 200, 0, 0.08)", border: "1px solid rgba(255, 200, 0, 0.3)", borderRadius: 8 }}>
                 <div>
-                  <div style={{ fontSize: 12, color: \"var(--text-dim)\" }}>{t(\"deposit.upload_window\")}</div>
-                  <div style={{ fontSize: 11, color: \"var(--text-dim)\" }}>{t(\"deposit.must_upload_5min\")}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{t("deposit.upload_window")}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{t("deposit.must_upload_5min")}</div>
                 </div>
                 {deadlineMs && <Countdown deadline={deadlineMs} onExpire={onCountdownExpire} />}
               </div>
 
-              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>{t(\"deposit.deposit_receipt\")}</div>
+              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>{t("deposit.deposit_receipt")}</div>
 
-              <div className=\"dep-summary\" style={{ fontSize: 13, marginBottom: 14 }}>
-                <SummaryRow label={t(\"deposit.sum_date\")} value={new Date(deposit.created_at).toLocaleString()} testid=\"dep-sum-date\" />
-                <SummaryRow label={t(\"deposit.sum_token\")} value={`${deposit.currency} (${COIN_NAMES[deposit.currency] || deposit.currency})`} testid=\"dep-sum-token\" />
-                <SummaryRow label={t(\"deposit.sum_amount\")} value={`${deposit.amount} ${deposit.currency}`} testid=\"dep-sum-amount\" />
-                <SummaryRow label={t(\"deposit.sum_wallet\")} value={deposit.wallet_address} mono testid=\"dep-sum-wallet\" />
-                <SummaryRow label={t(\"deposit.sum_network\")} value={deposit.network || deposit.currency} testid=\"dep-sum-network\" />
-                <SummaryRow label={t(\"deposit.sum_status\")} value={<StatusPill s={deposit.status} />} testid=\"dep-sum-status\" />
+              <div className="dep-summary" style={{ fontSize: 13, marginBottom: 14 }}>
+                <SummaryRow label={t("deposit.sum_date")} value={new Date(deposit.created_at).toLocaleString()} testid="dep-sum-date" />
+                <SummaryRow label={t("deposit.sum_token")} value={`${deposit.currency} (${COIN_NAMES[deposit.currency] || deposit.currency})`} testid="dep-sum-token" />
+                <SummaryRow label={t("deposit.sum_amount")} value={`${deposit.amount} ${deposit.currency}`} testid="dep-sum-amount" />
+                <SummaryRow label={t("deposit.sum_wallet")} value={deposit.wallet_address} mono testid="dep-sum-wallet" />
+                <SummaryRow label={t("deposit.sum_network")} value={deposit.network || deposit.currency} testid="dep-sum-network" />
+                <SummaryRow label={t("deposit.sum_status")} value={<StatusPill s={deposit.status} />} testid="dep-sum-status" />
               </div>
 
-              <label className=\"lbl\" style={{ display: \"flex\", alignItems: \"center\", gap: 6 }}>
-                {t(\"deposit.upload_screenshot\")}
-                <span style={{ color: \"#ff6b6b\", fontWeight: 700 }} aria-hidden=\"true\">*</span>
-                <span style={{ color: \"var(--text-dim)\", fontSize: 11, fontWeight: 400 }}>{t(\"deposit.required\")}</span>
+              <label className="lbl" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {t("deposit.upload_screenshot")}
+                <span style={{ color: "#ff6b6b", fontWeight: 700 }} aria-hidden="true">*</span>
+                <span style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 400 }}>{t("deposit.required")}</span>
               </label>
-              <input ref={fileInputRef} type=\"file\"
-                accept=\"image/jpeg,image/jpg,image/png,image/webp,image/gif\"
-                onChange={onPickFile} required aria-required=\"true\" data-testid=\"dep-receipt-file\"/>
+              <input ref={fileInputRef} type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                onChange={onPickFile} required aria-required="true" data-testid="dep-receipt-file"/>
               {!receiptFile && (
-                <div className=\"text-dim\" style={{ marginTop: 6, fontSize: 12 }} data-testid=\"dep-receipt-hint\">
-                  {t(\"deposit.hint_supported\")}
+                <div className="text-dim" style={{ marginTop: 6, fontSize: 12 }} data-testid="dep-receipt-hint">
+                  {t("deposit.hint_supported")}
                 </div>
               )}
               {receiptPreview && (
-                <img src={receiptPreview} alt=\"receipt preview\"
-                  style={{ maxWidth: \"100%\", marginTop: 10, borderRadius: 8 }} data-testid=\"dep-receipt-preview\"/>
+                <img src={receiptPreview} alt="receipt preview"
+                  style={{ maxWidth: "100%", marginTop: 10, borderRadius: 8 }} data-testid="dep-receipt-preview"/>
               )}
               {busy && uploadProgress > 0 && (
-                <div style={{ marginTop: 10, fontSize: 12 }} className=\"text-dim\">
-                  {t(\"deposit.uploading_pct\", { pct: uploadProgress })}
+                <div style={{ marginTop: 10, fontSize: 12 }} className="text-dim">
+                  {t("deposit.uploading_pct", { pct: uploadProgress })}
                 </div>
               )}
-              {err && <div className=\"text-red\" style={{ marginTop: 10, fontSize: 13 }} data-testid=\"dep-receipt-err\">{err}</div>}
-              {msg && <div className=\"text-green\" style={{ marginTop: 10, fontSize: 13 }}>{msg}</div>}
-              <div style={{ display: \"flex\", gap: 10, marginTop: 14 }}>
-                <button type=\"button\" className=\"btn btn-ghost\" onClick={cancelDeposit} disabled={busy} data-testid=\"dep-cancel\">
-                  {t(\"deposit.cancel\")}
+              {err && <div className="text-red" style={{ marginTop: 10, fontSize: 13 }} data-testid="dep-receipt-err">{err}</div>}
+              {msg && <div className="text-green" style={{ marginTop: 10, fontSize: 13 }}>{msg}</div>}
+              <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                <button type="button" className="btn btn-ghost" onClick={cancelDeposit} disabled={busy} data-testid="dep-cancel">
+                  {t("deposit.cancel")}
                 </button>
-                <button type=\"button\" className=\"btn btn-primary\" onClick={onSubmitReceipt}
-                  disabled={busy || !receiptFile} data-testid=\"dep-submit-receipt\">
-                  {busy ? <span className=\"spinner\" /> : t(\"deposit.continue\")}
+                <button type="button" className="btn btn-primary" onClick={onSubmitReceipt}
+                  disabled={busy || !receiptFile} data-testid="dep-submit-receipt">
+                  {busy ? <span className="spinner" /> : t("deposit.continue")}
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        <div className=\"panel\" style={{ padding: 24 }}>
-          <div style={{ fontWeight: 600, marginBottom: 12 }}>{t(\"deposit.recent_deposits\")}</div>
-          <div style={{ overflowX: \"auto\" }}>
-            <table className=\"tbl\" data-testid=\"dep-history-table\">
+        <div className="panel" style={{ padding: 24 }}>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>{t("deposit.recent_deposits")}</div>
+          <div style={{ overflowX: "auto" }}>
+            <table className="tbl" data-testid="dep-history-table">
               <thead>
                 <tr>
-                  <th>{t(\"deposit.col_date\")}</th>
-                  <th>{t(\"deposit.col_token\")}</th>
-                  <th>{t(\"deposit.col_amount\")}</th>
-                  <th>{t(\"deposit.col_wallet\")}</th>
-                  <th>{t(\"deposit.col_status\")}</th>
+                  <th>{t("deposit.col_date")}</th>
+                  <th>{t("deposit.col_token")}</th>
+                  <th>{t("deposit.col_amount")}</th>
+                  <th>{t("deposit.col_wallet")}</th>
+                  <th>{t("deposit.col_status")}</th>
                 </tr>
               </thead>
               <tbody>
                 {history.length === 0 && (
-                  <tr><td colSpan={5} className=\"text-dim\">{t(\"deposit.no_deposits\")}</td></tr>
+                  <tr><td colSpan={5} className="text-dim">{t("deposit.no_deposits")}</td></tr>
                 )}
                 {history.map((h) => (
                   <tr key={h.id} data-testid={`dep-row-${h.id}`}>
                     <td style={{ fontSize: 12 }}>{new Date(h.created_at).toLocaleString()}</td>
                     <td>{h.currency}</td>
                     <td>{h.amount} {h.currency}</td>
-                    <td style={{ fontSize: 11, maxWidth: 140, overflow: \"hidden\", textOverflow: \"ellipsis\" }} title={h.wallet_address}>
+                    <td style={{ fontSize: 11, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }} title={h.wallet_address}>
                       {h.wallet_address}
                     </td>
                     <td><StatusPill s={h.status} /></td>
@@ -297,8 +297,8 @@ export default function Deposit() {
 function SummaryRow({ label, value, mono, testid }) {
   return (
     <div data-testid={testid}>
-      <div className=\"k\">{label}</div>
-      <div className={`v ${mono ? \"mono\" : \"\"}`}>{value}</div>
+      <div className="k">{label}</div>
+      <div className={`v ${mono ? "mono" : ""}`}>{value}</div>
     </div>
   );
 }
