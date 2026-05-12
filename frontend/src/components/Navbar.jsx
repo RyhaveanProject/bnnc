@@ -30,7 +30,7 @@ export default function Navbar() {
     <header className="nav" data-testid="navbar">
       <div style={{display:"flex", alignItems:"center", gap:32}}>
         <Link to="/" className="brand" data-testid="brand-link" onClick={close}>
-          <span className="b1">ADX</span><span className="b2">AMERICA</span>
+          <span className="b1">ADX</span><span className="b2">DUBAI</span>
         </Link>
         <nav className="nav-links hide-mobile">
           {userLinks}
