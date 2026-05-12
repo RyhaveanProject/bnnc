@@ -35,7 +35,7 @@ export default function Login() {
       <form onSubmit={onSubmit} className="panel" style={{ padding: 32, width: "100%", maxWidth: 420 }}>
         <div className="brand" style={{ textAlign: "center", marginBottom: 6, fontSize: 24 }}>
           <span className="b1">ADX</span>{" "}
-          <span style={{ color: "#fff", fontWeight: 600, fontSize: 16, marginLeft: 4 }}>America</span>
+          <span style={{ color: "#fff", fontWeight: 600, fontSize: 16, marginLeft: 4 }}>DUBAI</span>
         </div>
         <h2 style={{ textAlign: "center", margin: "0 0 24px", fontSize: 20 }}>Welcome back</h2>
 
