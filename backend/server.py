@@ -545,26 +545,50 @@ async def tg_send(method: str, payload: dict, files: dict = None) -> dict:
 
 
 async def _register_telegram_webhook():
-    """Auto-register Telegram webhook on startup if FRONTEND_URL/BACKEND_URL set."""
+    """Auto-register Telegram webhook on startup.
+
+    IMPORTANT: must use the BACKEND public URL (where this FastAPI app is reachable),
+    NEVER the frontend URL. On platforms like Render the public URL is exposed via
+    the RENDER_EXTERNAL_URL env var; we also support a manual BACKEND_URL.
+    FRONTEND_URL is intentionally NOT used as a fallback because the frontend
+    (e.g. Cloudflare Worker static site) does not host the /api/telegram/webhook
+    endpoint and returns 404, which leaves the Telegram inline button stuck on
+    "Loading..." forever.
+    """
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     if not token:
         return
-    base = os.environ.get("BACKEND_URL", "").strip() or os.environ.get("FRONTEND_URL", "").strip()
+    base = (
+        os.environ.get("BACKEND_URL", "").strip()
+        or os.environ.get("RENDER_EXTERNAL_URL", "").strip()
+    )
     if not base:
+        logger.warning(
+            "Telegram webhook NOT registered: set BACKEND_URL (or RENDER_EXTERNAL_URL) "
+            "to the public API origin, e.g. https://your-app.onrender.com"
+        )
         return
     base = base.rstrip("/")
     webhook_url = f"{base}/api/telegram/webhook"
     secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "").strip()
     try:
         async with httpx.AsyncClient(timeout=15) as cli:
-            payload = {"url": webhook_url, "allowed_updates": ["callback_query", "message"]}
+            payload = {
+                "url": webhook_url,
+                "allowed_updates": ["callback_query", "message"],
+                "drop_pending_updates": False,
+            }
             if secret:
                 payload["secret_token"] = secret
             r = await cli.post(
                 f"https://api.telegram.org/bot{token}/setWebhook",
                 json=payload,
             )
-            logger.info("Telegram setWebhook %s -> %s", webhook_url, r.status_code)
+            try:
+                body = r.json()
+            except Exception:
+                body = {"status": r.status_code}
+            logger.info("Telegram setWebhook %s -> %s", webhook_url, body)
     except Exception as e:
         logger.warning("Telegram setWebhook failed: %s", e)
 
@@ -635,7 +659,10 @@ async def telegram_webhook(request: Request):
         got = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
         if got != expected_secret:
             raise HTTPException(status_code=403, detail="Forbidden")
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return {"ok": True}
     cb = body.get("callback_query")
     if not cb:
         return {"ok": True}
@@ -649,18 +676,39 @@ async def telegram_webhook(request: Request):
         await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Unauthorized"})
         return {"ok": True}
 
+    # Safety wrapper: no matter what happens below, Telegram MUST get an
+    # answerCallbackQuery, otherwise the inline button shows "Loading..." forever.
+    try:
+        await _handle_callback(cb_id, data, msg_chat_id, msg_id)
+    except Exception as e:
+        logger.exception("Telegram callback handler crashed: %s", e)
+        try:
+            await tg_send("answerCallbackQuery", {
+                "callback_query_id": cb_id,
+                "text": "Server error, please try again",
+                "show_alert": False,
+            })
+        except Exception:
+            pass
+    return {"ok": True}
+
+
+async def _handle_callback(cb_id: str, data: str, msg_chat_id: str, msg_id):
     op, _, target_id = data.partition(":")
+    if op == "noop":
+        await tg_send("answerCallbackQuery", {"callback_query_id": cb_id})
+        return
     if op == "adep":
         dep = await db.deposits.find_one({"id": target_id}, {"_id": 0})
         if not dep:
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Deposit not found"})
-            return {"ok": True}
+            return
         if dep["status"] in ("approved", "completed"):
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Already confirmed"})
-            return {"ok": True}
+            return
         if dep["status"] == "rejected":
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Already rejected"})
-            return {"ok": True}
+            return
         # Convert deposit amount to USD (USDT) at live market rate.
         # ALL approved deposits credit the user's USDT balance.
         usd_value = await _deposit_usd_value(dep["currency"], float(dep["amount"]))
@@ -677,7 +725,7 @@ async def telegram_webhook(request: Request):
         )
         if flip.modified_count == 0:
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Already processed"})
-            return {"ok": True}
+            return
         await db.users.update_one(
             {"id": dep["user_id"]},
             {"$inc": {"balances.USDT": float(usd_value)}},
@@ -695,7 +743,7 @@ async def telegram_webhook(request: Request):
         )
         if flip.modified_count == 0:
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Already processed"})
-            return {"ok": True}
+            return
         await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Deposit cancelled ❌"})
         if msg_id:
             await tg_send("editMessageReplyMarkup", {
@@ -706,7 +754,7 @@ async def telegram_webhook(request: Request):
         w = await db.withdrawals.find_one({"id": target_id}, {"_id": 0})
         if not w:
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Not found"})
-            return {"ok": True}
+            return
         await db.withdrawals.update_one({"id": target_id}, {"$set": {"status": "paid", "paid_at": now_iso()}})
         await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Withdraw marked paid"})
         if msg_id:
@@ -725,7 +773,9 @@ async def telegram_webhook(request: Request):
                 "chat_id": msg_chat_id, "message_id": msg_id,
                 "reply_markup": {"inline_keyboard": [[{"text": "❌ REJECTED", "callback_data": "noop"}]]},
             })
-    return {"ok": True}
+    else:
+        # Unknown callback data — still answer so the loader disappears.
+        await tg_send("answerCallbackQuery", {"callback_query_id": cb_id})
 
 
 # ============ DEPOSITS ============
