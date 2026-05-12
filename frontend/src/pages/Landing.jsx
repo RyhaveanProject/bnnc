@@ -26,7 +26,7 @@ export default function Landing() {
               with <span className="text-yellow">confidence</span>
             </h1>
             <p className="hero-subtitle">
-              ADX America — fast, secure, professional crypto trading platform.
+              ADX DUBAI — fast, secure, professional crypto trading platform.
               Buy, sell, deposit and withdraw USDT, BTC, ETH, TRX and BNB
               instantly, backed by institutional-grade infrastructure.
             </p>
@@ -52,7 +52,7 @@ export default function Landing() {
       {/* ABOUT */}
       <section id="about" className="container-pad landing-section about-section" data-testid="about-section">
         <div className="section-head">
-          <span className="section-kicker">About ADX America</span>
+          <span className="section-kicker">About ADX DUBAI</span>
           <h2 className="section-title">
             A professional market, <span className="text-yellow">built for the next era</span>
           </h2>
@@ -61,9 +61,9 @@ export default function Landing() {
         <div className="about-grid">
           <div className="about-copy">
             <p>
-              Founded on <strong>15 November 2000</strong>, ADX America is a
+              Founded on <strong>15 November 2000</strong>, ADX DUBAI is a
               forward-looking financial markets platform inspired by the
-              standards of the <strong>Abu Dhabi Securities Exchange (ADX)</strong>.
+              standards of <strong>Dubai Financial Markets</strong>.
               For more than two decades, our mission has been the same:
               bring institutional-grade market infrastructure, transparent
               execution and disciplined risk management to a wider universe
@@ -74,7 +74,7 @@ export default function Landing() {
               speed and accessibility of modern blockchain assets. Through
               advanced trading technology, real-time price discovery sourced
               from the world's top venues, and investor-centric services,
-              ADX America empowers individuals and institutions to participate
+              ADX DUBAI empowers individuals and institutions to participate
               confidently in the next generation of global markets.
             </p>
             <p>
@@ -82,7 +82,7 @@ export default function Landing() {
               and frontier markets deserve the same quality of access,
               liquidity and security as established financial centres. From
               secure custody and KYC-aligned operations to 24/7 multi-asset
-              trading, every system at ADX America is engineered for trust.
+              trading, every system at ADX DUBAI is engineered for trust.
             </p>
 
             <div className="about-pillars">
@@ -116,7 +116,7 @@ export default function Landing() {
           <aside className="about-card panel">
             <div className="about-card-head">
               <div className="text-dim about-card-label">Company Snapshot</div>
-              <div className="about-card-title">ADX America</div>
+              <div className="about-card-title">ADX DUBAI</div>
             </div>
             <ul className="about-meta">
               <li>
@@ -152,7 +152,7 @@ export default function Landing() {
       {/* WHY ADX */}
       <section id="why" className="container-pad landing-section why-section" data-testid="why-section">
         <div className="section-head">
-          <span className="section-kicker">Why ADX America</span>
+          <span className="section-kicker">Why ADX DUBAI</span>
           <h2 className="section-title">Engineered for <span className="text-yellow">trust</span></h2>
         </div>
 
@@ -213,7 +213,7 @@ export default function Landing() {
         <div className="cta-card panel" data-testid="cta-card">
           <div>
             <div className="section-kicker">Get started in minutes</div>
-            <h3 className="cta-title">Open your ADX America account today</h3>
+            <h3 className="cta-title">Open your ADX DUBAI account today</h3>
             <p className="text-dim cta-text">
               Join hundreds of thousands of traders accessing professional
               crypto markets through a single, secure platform.
