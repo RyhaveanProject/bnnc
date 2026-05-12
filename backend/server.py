@@ -147,7 +147,7 @@ class TradeIn(BaseModel):
 
 
 # --- App ---
-app = FastAPI(title="ADX America")
+app = FastAPI(title="ADX DUBAI")
 api = APIRouter(prefix="/api")
 
 
@@ -397,7 +397,7 @@ async def _kucoin_sparkline(cli: httpx.AsyncClient, symbol: str) -> List[float]:
 
 
 async def _build_market_data() -> List[dict]:
-    async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "ADX-America/1.0"}) as cli:
+    async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "ADX-DUBAI/1.0"}) as cli:
         tickers = await _kucoin_all_tickers(cli)
         coins_for_candles = [c for c in TRADING_PAIRS if c != "USDT"]
         spark_results = await asyncio.gather(
@@ -1138,7 +1138,7 @@ async def admin_withdrawals(admin: dict = Depends(require_admin)):
 # ---
 @api.get("/")
 async def root():
-    return {"name": "ADX America API", "status": "ok"}
+    return {"name": "ADX DUBAI API", "status": "ok"}
 
 
 app.include_router(api)
