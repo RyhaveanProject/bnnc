@@ -1,54 +1,53 @@
-import React from "react";
-import { Link } from "react-router-dom";
+
+import React from \"react\";
+import { Link } from \"react-router-dom\";
+import { useTranslation } from \"react-i18next\";
 
 export default function Footer() {
+  const { t } = useTranslation();
   const year = new Date().getFullYear();
   return (
-    <footer className="site-footer" data-testid="site-footer">
-      <div className="footer-inner">
-        <div className="footer-col footer-brand-col">
-          <Link to="/" className="brand" data-testid="footer-brand">
-            <span className="b1">ADX</span><span className="b2">DUBAI</span>
+    <footer className=\"site-footer\" data-testid=\"site-footer\">
+      <div className=\"footer-inner\">
+        <div className=\"footer-col footer-brand-col\">
+          <Link to=\"/\" className=\"brand\" data-testid=\"footer-brand\">
+            <span className=\"b1\">ADX</span><span className=\"b2\">DUBAI</span>
           </Link>
-          <p className="text-dim footer-tagline">
-            Institutional-grade digital asset trading inspired by the standards
-            of Dubai Financial Markets. Established 15 November 2000.
-          </p>
-          <div className="footer-pills">
-            <span className="pill approved">Secure Custody</span>
-            <span className="pill pending">24/7 Markets</span>
+          <p className=\"text-dim footer-tagline\">{t(\"footer.tagline\")}</p>
+          <div className=\"footer-pills\">
+            <span className=\"pill approved\">{t(\"footer.secure_custody\")}</span>
+            <span className=\"pill pending\">{t(\"footer.markets_247\")}</span>
           </div>
         </div>
 
-        <div className="footer-col">
-          <div className="footer-title">Platform</div>
-          <Link to="/markets" className="footer-link" data-testid="footer-markets">Markets</Link>
-          <Link to="/trade" className="footer-link" data-testid="footer-trade">Trade</Link>
-          <Link to="/deposit" className="footer-link" data-testid="footer-deposit">Deposit</Link>
-          <Link to="/withdraw" className="footer-link" data-testid="footer-withdraw">Withdraw</Link>
+        <div className=\"footer-col\">
+          <div className=\"footer-title\">{t(\"footer.platform\")}</div>
+          <Link to=\"/markets\" className=\"footer-link\" data-testid=\"footer-markets\">{t(\"nav.markets\")}</Link>
+          <Link to=\"/trade\" className=\"footer-link\" data-testid=\"footer-trade\">{t(\"nav.trade\")}</Link>
+          <Link to=\"/deposit\" className=\"footer-link\" data-testid=\"footer-deposit\">{t(\"nav.deposit\")}</Link>
+          <Link to=\"/withdraw\" className=\"footer-link\" data-testid=\"footer-withdraw\">{t(\"nav.withdraw\")}</Link>
         </div>
 
-        <div className="footer-col">
-          <div className="footer-title">Company</div>
-          <a href="#about" className="footer-link" data-testid="footer-about">About</a>
-          <a href="#why" className="footer-link" data-testid="footer-why">Why ADX DUBAI</a>
-          <Link to="/support" className="footer-link" data-testid="footer-support">Support</Link>
+        <div className=\"footer-col\">
+          <div className=\"footer-title\">{t(\"footer.company\")}</div>
+          <a href=\"#about\" className=\"footer-link\" data-testid=\"footer-about\">{t(\"footer.about\")}</a>
+          <a href=\"#why\" className=\"footer-link\" data-testid=\"footer-why\">{t(\"footer.why_adx\")}</a>
+          <Link to=\"/support\" className=\"footer-link\" data-testid=\"footer-support\">{t(\"footer.support\")}</Link>
         </div>
 
-        <div className="footer-col">
-          <div className="footer-title">Legal</div>
-          <span className="footer-link footer-static">Terms of Service</span>
-          <span className="footer-link footer-static">Privacy Policy</span>
-          <span className="footer-link footer-static">Risk Disclosure</span>
+        <div className=\"footer-col\">
+          <div className=\"footer-title\">{t(\"footer.legal\")}</div>
+          <span className=\"footer-link footer-static\">{t(\"footer.terms\")}</span>
+          <span className=\"footer-link footer-static\">{t(\"footer.privacy\")}</span>
+          <span className=\"footer-link footer-static\">{t(\"footer.risk\")}</span>
         </div>
       </div>
 
-      <div className="footer-bottom">
-        <span className="text-dim">© {year} ADX DUBAI. All rights reserved.</span>
-        <span className="text-dim footer-disclaimer">
-          Digital asset trading involves risk. Trade responsibly.
-        </span>
+      <div className=\"footer-bottom\">
+        <span className=\"text-dim\">{t(\"footer.copyright\", { year })}</span>
+        <span className=\"text-dim footer-disclaimer\">{t(\"footer.disclaimer\")}</span>
       </div>
     </footer>
   );
-}
+
+
