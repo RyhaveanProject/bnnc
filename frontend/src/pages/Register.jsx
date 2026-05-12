@@ -39,27 +39,27 @@ export default function Register() {
     <div className="hero-bg" style={{minHeight:"calc(100vh - 60px)", display:"grid", placeItems:"center", padding:24}} data-testid="register-page">
       <form onSubmit={onSubmit} className="panel" style={{padding:32, width:"100%", maxWidth:460}}>
         <div className="brand" style={{textAlign:"center", marginBottom:6, fontSize:24}}>
-          <span className="b1">ADX</span> <span style={{color:"#fff", fontWeight:600, fontSize:16, marginLeft:4}}>America</span>
+          <span className="b1">ADX</span> <span style={{color:"#fff", fontWeight:600, fontSize:16, marginLeft:4}}>DUBAI</span>
         </div>
         <h2 style={{textAlign:"center", margin:"0 0 20px", fontSize:20}}>Create your account</h2>
 
         <label className="lbl">Username</label>
         <input className="input" value={username} onChange={e=>setUsername(e.target.value)} minLength={3} required data-testid="register-username"/>
         <div style={{height:12}}/>
-        <label className="lbl">Email (real address required)</label>
+        <label className="lbl">Email required </label>
         <input className="input" type="email" value={email} onChange={e=>setEmail(e.target.value)} required data-testid="register-email" autoComplete="email"/>
         <div style={{height:12}}/>
-        <label className="lbl">Password (8+ chars, letters + numbers)</label>
+        <label className="lbl">Password </label>
         <input className="input" type="password" value={password} onChange={e=>setPassword(e.target.value)} required data-testid="register-password" autoComplete="new-password"/>
         <div style={{height:12}}/>
-        <label className="lbl">Confirm password</label>
+        <label className="lbl">Confirm </label>
         <input className="input" type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} required data-testid="register-confirm" autoComplete="new-password"/>
 
         {err && <div className="text-red" style={{marginTop:12, fontSize:13}} data-testid="register-error">{err}</div>}
 
         {phase === "wait" && (
           <div style={{marginTop:14, padding:12, borderRadius:8, background:"rgba(240,185,11,.08)", color:"var(--yellow)", display:"flex", alignItems:"center", gap:10, fontSize:13}} data-testid="register-wait">
-            <span className="spinner"/> Please wait 5 seconds, your account is being created…
+            <span className="spinner"/> Please wait, your account is being created…
           </div>
         )}
 
