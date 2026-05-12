@@ -8,11 +8,11 @@ export default function Footer() {
       <div className="footer-inner">
         <div className="footer-col footer-brand-col">
           <Link to="/" className="brand" data-testid="footer-brand">
-            <span className="b1">ADX</span><span className="b2">AMERICA</span>
+            <span className="b1">ADX</span><span className="b2">DUBAI</span>
           </Link>
           <p className="text-dim footer-tagline">
             Institutional-grade digital asset trading inspired by the standards
-            of the Abu Dhabi Securities Exchange. Established 15 November 2000.
+            of Dubai Financial Markets. Established 15 November 2000.
           </p>
           <div className="footer-pills">
             <span className="pill approved">Secure Custody</span>
@@ -31,7 +31,7 @@ export default function Footer() {
         <div className="footer-col">
           <div className="footer-title">Company</div>
           <a href="#about" className="footer-link" data-testid="footer-about">About</a>
-          <a href="#why" className="footer-link" data-testid="footer-why">Why ADX America</a>
+          <a href="#why" className="footer-link" data-testid="footer-why">Why ADX DUBAI</a>
           <Link to="/support" className="footer-link" data-testid="footer-support">Support</Link>
         </div>
 
@@ -44,7 +44,7 @@ export default function Footer() {
       </div>
 
       <div className="footer-bottom">
-        <span className="text-dim">© {year} ADX America. All rights reserved.</span>
+        <span className="text-dim">© {year} ADX DUBAI. All rights reserved.</span>
         <span className="text-dim footer-disclaimer">
           Digital asset trading involves risk. Trade responsibly.
         </span>
