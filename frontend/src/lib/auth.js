@@ -97,9 +97,24 @@ export function AuthProvider({ children }) {
   };
   const register = async (email, password, username) => {
     const { data } = await api.post("/auth/register", { email, password, username });
+    if (data && data.token) {
+      // Back-compat path (e.g. admin-created accounts that skip verification)
+      localStorage.setItem("adx_token", data.token);
+      setUser(data.user);
+      return { verified: true, user: data.user };
+    }
+    // New flow: server sent a verification email and is waiting for the code.
+    return { verified: false, email, ttl_minutes: data?.ttl_minutes, resend_cooldown_sec: data?.resend_cooldown_sec };
+  };
+  const registerVerify = async (email, code) => {
+    const { data } = await api.post("/auth/register/verify", { email, code });
     if (data.token) localStorage.setItem("adx_token", data.token);
     setUser(data.user);
     return data.user;
+  };
+  const registerResend = async (email) => {
+    const { data } = await api.post("/auth/register/resend", { email });
+    return data;
   };
   const logout = async () => {
     try {
@@ -113,7 +128,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthCtx.Provider
-      value={{ user, setUser, loading, login, adminLogin, register, logout, refresh }}
+      value={{ user, setUser, loading, login, adminLogin, register, registerVerify, registerResend, logout, refresh }}
     >
       {children}
     </AuthCtx.Provider>
