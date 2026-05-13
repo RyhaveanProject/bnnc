@@ -11,12 +11,14 @@ import logging
 import base64
 import time
 import json
+import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal
 
 import bcrypt
 import jwt
 import httpx
+import resend
 from bson import ObjectId
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File, Form
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -55,6 +57,12 @@ DEPOSIT_RECEIPT_TIMEOUT_MIN = 5
 # Max receipt file size (8 MB)
 MAX_RECEIPT_SIZE = 8 * 1024 * 1024
 ALLOWED_RECEIPT_MIME = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
+
+# --- Email verification (signup OTP via Resend) ---
+OTP_CODE_LENGTH = 6
+OTP_TTL_MIN = 10            # code is valid for 10 minutes
+OTP_RESEND_COOLDOWN_SEC = 60  # min seconds between resend requests
+OTP_MAX_ATTEMPTS = 5        # max wrong attempts before code is invalidated
 
 
 def get_jwt_secret() -> str:
@@ -95,6 +103,15 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     username: str = Field(min_length=3, max_length=32)
+
+
+class RegisterVerifyIn(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
+
+
+class RegisterResendIn(BaseModel):
+    email: EmailStr
 
 
 class LoginIn(BaseModel):
@@ -239,6 +256,13 @@ async def startup():
     await db.withdrawals.create_index("id", unique=True)
     await db.trades.create_index("id", unique=True)
     await db.wallet_configs.create_index("currency", unique=True)
+    # Pending signups (email verification). Auto-expire docs via TTL on `expires_at`.
+    await db.pending_signups.create_index("email", unique=True)
+    try:
+        await db.pending_signups.create_index("expires_at", expireAfterSeconds=0)
+    except Exception as _e:
+        # In Mongo, changing TTL options requires drop & recreate. Best-effort.
+        logger.warning("pending_signups TTL index setup: %s", _e)
     # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "").lower()
     admin_pwd = os.environ.get("ADMIN_PASSWORD", "")
@@ -283,29 +307,229 @@ async def shutdown():
 
 
 # ============ AUTH ============
-@api.post("/auth/register")
-async def register(data: RegisterIn, response: Response):
+
+# ---- Resend email helpers ----
+def _resend_configured() -> bool:
+    return bool(os.environ.get("RESEND_API_KEY", "").strip())
+
+
+def _resend_from() -> str:
+    addr = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev").strip() or "onboarding@resend.dev"
+    name = os.environ.get("RESEND_FROM_NAME", "").strip()
+    if name:
+        return f"{name} <{addr}>"
+    return addr
+
+
+def _otp_email_html(username: str, code: str) -> str:
+    # Inline CSS only; safe for email clients
+    return f"""
+<!doctype html>
+<html><body style="margin:0;padding:0;background:#0b0e11;font-family:Arial,Helvetica,sans-serif;color:#eaecef;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b0e11;padding:32px 12px;">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#161a1e;border:1px solid #2b3139;border-radius:12px;overflow:hidden;">
+      <tr><td style="padding:28px 28px 8px;text-align:center;">
+        <div style="font-size:22px;font-weight:800;letter-spacing:1px;">
+          <span style="color:#f0b90b;">ADX</span>
+          <span style="color:#ffffff;font-weight:600;margin-left:4px;">DUBAI</span>
+        </div>
+      </td></tr>
+      <tr><td style="padding:8px 28px 0;text-align:center;">
+        <h1 style="margin:18px 0 6px;font-size:20px;color:#ffffff;">Email təsdiqləmə kodu</h1>
+        <p style="margin:0;color:#b7bdc6;font-size:14px;">Salam <strong style="color:#eaecef;">{username}</strong>, ADX DUBAI hesabınızı yaratmaq üçün aşağıdakı kodu daxil edin.</p>
+      </td></tr>
+      <tr><td style="padding:22px 28px 6px;text-align:center;">
+        <div style="display:inline-block;padding:14px 22px;background:#0b0e11;border:1px solid #2b3139;border-radius:10px;
+                    font-size:32px;letter-spacing:10px;font-weight:800;color:#f0b90b;">{code}</div>
+      </td></tr>
+      <tr><td style="padding:8px 28px 22px;text-align:center;">
+        <p style="margin:14px 0 0;color:#848e9c;font-size:12px;line-height:1.55;">
+          Bu kod <strong style="color:#eaecef;">{OTP_TTL_MIN} dəqiqə</strong> ərzində etibarlıdır.<br>
+          Əgər bu qeydiyyatı siz başlatmamısınızsa, bu məktubu nəzərə almayın.
+        </p>
+      </td></tr>
+      <tr><td style="background:#0b0e11;padding:16px 28px;text-align:center;border-top:1px solid #2b3139;">
+        <span style="color:#5e6673;font-size:11px;">© ADX DUBAI &middot; adx-dubai.com</span>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>
+"""
+
+
+async def _send_verification_email(to_email: str, username: str, code: str) -> None:
+    """Send OTP via Resend (non-blocking). Raises HTTPException on failure."""
+    if not _resend_configured():
+        logger.error("RESEND_API_KEY not configured; cannot send verification email")
+        raise HTTPException(status_code=500, detail="Email service not configured")
+    resend.api_key = os.environ["RESEND_API_KEY"].strip()
+    params = {
+        "from": _resend_from(),
+        "to": [to_email],
+        "subject": f"ADX DUBAI — Təsdiq kodu: {code}",
+        "html": _otp_email_html(username, code),
+    }
+    try:
+        result = await asyncio.to_thread(resend.Emails.send, params)
+        logger.info("Resend email sent to %s id=%s", to_email, (result or {}).get("id"))
+    except Exception as e:
+        logger.error("Resend send failed for %s: %s", to_email, e)
+        # Surface a friendly error; common cause: unverified domain in production
+        msg = str(e)
+        if "domain is not verified" in msg.lower() or "not verified" in msg.lower():
+            raise HTTPException(status_code=500, detail="Email sender domain not verified yet. Please try again later.")
+        raise HTTPException(status_code=500, detail="Failed to send verification email")
+
+
+def _generate_otp() -> str:
+    # 6-digit numeric, zero-padded, cryptographically random
+    return f"{secrets.randbelow(10**OTP_CODE_LENGTH):0{OTP_CODE_LENGTH}d}"
+
+
+@api.post("/auth/register/start")
+async def register_start(data: RegisterIn):
+    """Step 1 of signup: validate, hash password, generate OTP, store pending
+    record, email the code via Resend. The actual user document is NOT created
+    until /auth/register/verify succeeds.
+    """
     email = data.email.lower()
-    if await db.users.find_one({"email": email}):
-        raise HTTPException(status_code=400, detail="Email already registered")
     pwd = data.password
     if len(pwd) < 8 or not any(c.isdigit() for c in pwd) or not any(c.isalpha() for c in pwd):
         raise HTTPException(status_code=400, detail="Password must be 8+ chars and contain letters and numbers")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Cooldown: if a recent pending request exists, throttle to avoid email spam
+    existing = await db.pending_signups.find_one({"email": email}, {"_id": 0})
+    if existing:
+        last = parse_iso(existing.get("last_sent_at", existing.get("created_at", now_iso())))
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        remaining = OTP_RESEND_COOLDOWN_SEC - int((datetime.now(timezone.utc) - last).total_seconds())
+        if remaining > 0:
+            raise HTTPException(status_code=429, detail=f"Please wait {remaining}s before requesting another code")
+
+    code = _generate_otp()
+    now = datetime.now(timezone.utc)
+    doc = {
+        "email": email,
+        "username": data.username,
+        "password_hash": hash_password(pwd),
+        "code_hash": hash_password(code),
+        "attempts": 0,
+        "created_at": now.isoformat(),
+        "last_sent_at": now.isoformat(),
+        # `expires_at` is a real datetime so the TTL index can purge it
+        "expires_at": now + timedelta(minutes=OTP_TTL_MIN),
+    }
+    await db.pending_signups.update_one({"email": email}, {"$set": doc}, upsert=True)
+    await _send_verification_email(email, data.username, code)
+    return {"ok": True, "email": email, "ttl_minutes": OTP_TTL_MIN, "resend_cooldown_sec": OTP_RESEND_COOLDOWN_SEC}
+
+
+@api.post("/auth/register/resend")
+async def register_resend(data: RegisterResendIn):
+    email = data.email.lower()
+    pending = await db.pending_signups.find_one({"email": email}, {"_id": 0})
+    if not pending:
+        raise HTTPException(status_code=404, detail="No pending registration for this email")
+
+    last = parse_iso(pending.get("last_sent_at", pending.get("created_at", now_iso())))
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    remaining = OTP_RESEND_COOLDOWN_SEC - int((datetime.now(timezone.utc) - last).total_seconds())
+    if remaining > 0:
+        raise HTTPException(status_code=429, detail=f"Please wait {remaining}s before requesting another code")
+
+    code = _generate_otp()
+    now = datetime.now(timezone.utc)
+    await db.pending_signups.update_one(
+        {"email": email},
+        {"$set": {
+            "code_hash": hash_password(code),
+            "attempts": 0,
+            "last_sent_at": now.isoformat(),
+            "expires_at": now + timedelta(minutes=OTP_TTL_MIN),
+        }},
+    )
+    await _send_verification_email(email, pending.get("username", ""), code)
+    return {"ok": True, "ttl_minutes": OTP_TTL_MIN, "resend_cooldown_sec": OTP_RESEND_COOLDOWN_SEC}
+
+
+@api.post("/auth/register/verify")
+async def register_verify(data: RegisterVerifyIn, response: Response):
+    """Step 2 of signup: validate OTP, create the real user, return JWT."""
+    email = data.email.lower()
+    pending = await db.pending_signups.find_one({"email": email}, {"_id": 0})
+    if not pending:
+        raise HTTPException(status_code=404, detail="No pending registration. Please start over.")
+
+    # Expiry check (defensive; TTL index already purges)
+    exp = pending.get("expires_at")
+    if isinstance(exp, str):
+        exp_dt = parse_iso(exp)
+    elif isinstance(exp, datetime):
+        exp_dt = exp
+    else:
+        exp_dt = datetime.now(timezone.utc) - timedelta(seconds=1)
+    if exp_dt.tzinfo is None:
+        exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > exp_dt:
+        await db.pending_signups.delete_one({"email": email})
+        raise HTTPException(status_code=400, detail="Code expired. Please request a new one.")
+
+    if int(pending.get("attempts", 0)) >= OTP_MAX_ATTEMPTS:
+        await db.pending_signups.delete_one({"email": email})
+        raise HTTPException(status_code=400, detail="Too many wrong attempts. Please request a new code.")
+
+    code = (data.code or "").strip()
+    if not code.isdigit() or len(code) != OTP_CODE_LENGTH or not verify_password(code, pending["code_hash"]):
+        await db.pending_signups.update_one({"email": email}, {"$inc": {"attempts": 1}})
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+
+    # Race condition guard: ensure email still free
+    if await db.users.find_one({"email": email}):
+        await db.pending_signups.delete_one({"email": email})
+        raise HTTPException(status_code=400, detail="Email already registered")
+
     uid = str(uuid.uuid4())
     user_doc = {
         "id": uid,
         "email": email,
-        "username": data.username,
-        "password_hash": hash_password(pwd),
+        "username": pending["username"],
+        "password_hash": pending["password_hash"],
         "role": "user",
         "balances": empty_balances(),
         "banned": False,
+        "email_verified": True,
         "created_at": now_iso(),
     }
     await db.users.insert_one(user_doc)
+    await db.pending_signups.delete_one({"email": email})
+
     token = create_access_token(uid, email, "user")
     set_auth_cookie(response, token)
-    return {"token": token, "user": {"id": uid, "email": email, "username": data.username, "role": "user", "balances": user_doc["balances"]}}
+    return {
+        "token": token,
+        "user": {
+            "id": uid, "email": email, "username": pending["username"],
+            "role": "user", "balances": user_doc["balances"],
+        },
+    }
+
+
+@api.post("/auth/register")
+async def register(data: RegisterIn):
+    """Legacy endpoint kept for backwards compatibility.
+
+    The signup flow now requires email verification. Clients should call
+    `/auth/register/start` followed by `/auth/register/verify`. We forward
+    here so older clients don't break (still triggers email + returns the
+    'pending' shape).
+    """
+    return await register_start(data)
 
 
 @api.post("/auth/login")
