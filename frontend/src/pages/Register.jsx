@@ -197,6 +197,26 @@ export default function Register() {
             <strong style={{ color: "var(--yellow)" }} data-testid="register-verify-email">{email}</strong>
           </p>
 
+          <div
+            data-testid="register-spam-notice"
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              padding: "10px 12px",
+              margin: "0 0 16px",
+              background: "rgba(240, 185, 11, 0.08)",
+              border: "1px solid rgba(240, 185, 11, 0.35)",
+              borderRadius: 8,
+              fontSize: 12.5,
+              lineHeight: 1.5,
+              color: "#eaecef",
+            }}
+          >
+            <span aria-hidden="true" style={{ color: "var(--yellow)", fontSize: 16, lineHeight: 1, flexShrink: 0 }}>!</span>
+            <span>{t("register.spam_notice")}</span>
+          </div>
+
           <label className="lbl">{t("register.code_label")}</label>
           <input
             className="input"
