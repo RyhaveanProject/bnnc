@@ -322,7 +322,7 @@ def _resend_from() -> str:
 
 
 def _otp_email_html(username: str, code: str) -> str:
-    # Inline CSS only; safe for email clients
+    # Inline CSS only; safe for email clients. English-only copy.
     return f"""
 <!doctype html>
 <html><body style="margin:0;padding:0;background:#0b0e11;font-family:Arial,Helvetica,sans-serif;color:#eaecef;">
@@ -336,8 +336,8 @@ def _otp_email_html(username: str, code: str) -> str:
         </div>
       </td></tr>
       <tr><td style="padding:8px 28px 0;text-align:center;">
-        <h1 style="margin:18px 0 6px;font-size:20px;color:#ffffff;">Email təsdiqləmə kodu</h1>
-        <p style="margin:0;color:#b7bdc6;font-size:14px;">Salam <strong style="color:#eaecef;">{username}</strong>, ADX DUBAI hesabınızı yaratmaq üçün aşağıdakı kodu daxil edin.</p>
+        <h1 style="margin:18px 0 6px;font-size:20px;color:#ffffff;">Email verification code</h1>
+        <p style="margin:0;color:#b7bdc6;font-size:14px;">Hi <strong style="color:#eaecef;">{username}</strong>, please use the code below to finish creating your ADX DUBAI account.</p>
       </td></tr>
       <tr><td style="padding:22px 28px 6px;text-align:center;">
         <div style="display:inline-block;padding:14px 22px;background:#0b0e11;border:1px solid #2b3139;border-radius:10px;
@@ -345,8 +345,9 @@ def _otp_email_html(username: str, code: str) -> str:
       </td></tr>
       <tr><td style="padding:8px 28px 22px;text-align:center;">
         <p style="margin:14px 0 0;color:#848e9c;font-size:12px;line-height:1.55;">
-          Bu kod <strong style="color:#eaecef;">{OTP_TTL_MIN} dəqiqə</strong> ərzində etibarlıdır.<br>
-          Əgər bu qeydiyyatı siz başlatmamısınızsa, bu məktubu nəzərə almayın.
+          This code is valid for <strong style="color:#eaecef;">{OTP_TTL_MIN} minutes</strong>.<br>
+          If you didn't request this, you can safely ignore this email.<br>
+          <span style="color:#5e6673;">Tip: if you don't see this message in your inbox, please check your spam / junk folder.</span>
         </p>
       </td></tr>
       <tr><td style="background:#0b0e11;padding:16px 28px;text-align:center;border-top:1px solid #2b3139;">
@@ -360,27 +361,57 @@ def _otp_email_html(username: str, code: str) -> str:
 
 
 async def _send_verification_email(to_email: str, username: str, code: str) -> None:
-    """Send OTP via Resend (non-blocking). Raises HTTPException on failure."""
+    """Send OTP via Resend HTTP API.
+
+    Uses httpx directly (instead of the blocking `resend` SDK) so we can apply
+    a strict timeout and run fully on the event loop. Raises HTTPException on
+    hard failure so callers can decide whether to surface the error.
+    """
     if not _resend_configured():
         logger.error("RESEND_API_KEY not configured; cannot send verification email")
         raise HTTPException(status_code=500, detail="Email service not configured")
-    resend.api_key = os.environ["RESEND_API_KEY"].strip()
-    params = {
+    api_key = os.environ["RESEND_API_KEY"].strip()
+    payload = {
         "from": _resend_from(),
         "to": [to_email],
-        "subject": f"ADX DUBAI — Təsdiq kodu: {code}",
+        "subject": f"ADX DUBAI — Verification code: {code}",
         "html": _otp_email_html(username, code),
     }
     try:
-        result = await asyncio.to_thread(resend.Emails.send, params)
-        logger.info("Resend email sent to %s id=%s", to_email, (result or {}).get("id"))
+        async with httpx.AsyncClient(timeout=10.0) as cli:
+            r = await cli.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+        if r.status_code >= 400:
+            body = r.text
+            logger.error("Resend send failed for %s: %s %s", to_email, r.status_code, body)
+            low = body.lower()
+            if "domain is not verified" in low or "not verified" in low:
+                raise HTTPException(status_code=500, detail="Email sender domain not verified yet. Please try again later.")
+            raise HTTPException(status_code=500, detail="Failed to send verification email")
+        try:
+            data = r.json()
+        except Exception:
+            data = {}
+        logger.info("Resend email sent to %s id=%s", to_email, data.get("id"))
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("Resend send failed for %s: %s", to_email, e)
-        # Surface a friendly error; common cause: unverified domain in production
-        msg = str(e)
-        if "domain is not verified" in msg.lower() or "not verified" in msg.lower():
-            raise HTTPException(status_code=500, detail="Email sender domain not verified yet. Please try again later.")
+        logger.error("Resend send error for %s: %s", to_email, e)
         raise HTTPException(status_code=500, detail="Failed to send verification email")
+
+
+async def _send_verification_email_bg(to_email: str, username: str, code: str) -> None:
+    """Background variant: never raises. Logs failures so 'Resend' button can recover."""
+    try:
+        await _send_verification_email(to_email, username, code)
+    except Exception as e:
+        logger.error("Background verification email failed for %s: %s", to_email, e)
 
 
 def _generate_otp() -> str:
@@ -425,7 +456,11 @@ async def register_start(data: RegisterIn):
         "expires_at": now + timedelta(minutes=OTP_TTL_MIN),
     }
     await db.pending_signups.update_one({"email": email}, {"$set": doc}, upsert=True)
-    await _send_verification_email(email, data.username, code)
+    # Fire-and-forget the email so the API responds immediately and the
+    # frontend can show the 6-digit code input form. On slow infra (cold start
+    # + Resend roundtrip) the previous blocking await could exceed the
+    # frontend axios timeout of 30s, leaving the UI stuck on "Loading…".
+    asyncio.create_task(_send_verification_email_bg(email, data.username, code))
     return {"ok": True, "email": email, "ttl_minutes": OTP_TTL_MIN, "resend_cooldown_sec": OTP_RESEND_COOLDOWN_SEC}
 
 
@@ -454,7 +489,9 @@ async def register_resend(data: RegisterResendIn):
             "expires_at": now + timedelta(minutes=OTP_TTL_MIN),
         }},
     )
-    await _send_verification_email(email, pending.get("username", ""), code)
+    # Fire-and-forget so the UI doesn't get stuck on "Loading…" while the
+    # email is being delivered through Resend.
+    asyncio.create_task(_send_verification_email_bg(email, pending.get("username", ""), code))
     return {"ok": True, "ttl_minutes": OTP_TTL_MIN, "resend_cooldown_sec": OTP_RESEND_COOLDOWN_SEC}
 
 
