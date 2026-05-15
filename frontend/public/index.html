@@ -49,19 +49,13 @@
 
         <!-- JivoChat Live Support -->
         <style>
-            /* Hide JivoChat floating launcher button by default.
-               It will only become visible when we explicitly activate it
-               via the in-app "Online support" button (body.jivo-active). */
-            jdiv, jdiv iframe, #jvlabelWrap, .__jivoMobileButton {
+            /* Hide the JivoChat launcher / widget globally.
+               Only the top-level <jdiv> wrapper that Jivo injects into <body>
+               is hidden, so Jivo's own internal layout (iframe, animations,
+               input area) keeps working untouched once the chat is opened
+               from the Support page via window.jivo_api.open().              */
+            body:not(.jivo-active) > jdiv {
                 display: none !important;
-                visibility: hidden !important;
-            }
-            body.jivo-active jdiv,
-            body.jivo-active jdiv iframe,
-            body.jivo-active #jvlabelWrap,
-            body.jivo-active .__jivoMobileButton {
-                display: block !important;
-                visibility: visible !important;
             }
         </style>
         <script src="//code.jivosite.com/widget/iJauSv0y03" async></script>
