@@ -1,0 +1,19 @@
+# Render Static Site config
+# Required so deep links like /support, /deposit, /admin etc. don't return 404
+# (which the browser sometimes saves as a .txt file). Every request that does
+# not match a real file is rewritten to /index.html so React-Router can handle it.
+services:
+  - type: web
+    name: adx-dubai-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: yarn install && yarn build
+    staticPublishPath: ./build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
