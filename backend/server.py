@@ -1511,7 +1511,10 @@ async def root():
 
 # ============ BINARY TRADING ============
 BINARY_TRADE_PROFIT_RATES = {300: 0.05, 600: 0.07, 900: 0.09, 1200: 0.12}
-BINARY_TRADE_ALLOWED_AMOUNTS = {1000.0, 5000.0, 10000.0, 50000.0}
+# No fixed allowed amount list — users may enter any positive USDT amount up to
+# their balance. Keep a soft upper bound to avoid absurd values.
+BINARY_TRADE_MIN_AMOUNT = 1.0
+BINARY_TRADE_MAX_AMOUNT = 1_000_000.0
 
 
 class BinaryTradePlaceIn(BaseModel):
@@ -1526,8 +1529,11 @@ async def binary_trade_place(data: BinaryTradePlaceIn, user: dict = Depends(get_
     sym = data.symbol.upper()
     if sym not in TRADING_PAIRS:
         raise HTTPException(status_code=400, detail="Invalid symbol")
-    if data.amount_usd not in BINARY_TRADE_ALLOWED_AMOUNTS:
-        raise HTTPException(status_code=400, detail="Amount must be 1000, 5000, 10000 or 50000 USDT")
+    if data.amount_usd < BINARY_TRADE_MIN_AMOUNT or data.amount_usd > BINARY_TRADE_MAX_AMOUNT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Amount must be between {BINARY_TRADE_MIN_AMOUNT} and {BINARY_TRADE_MAX_AMOUNT} USDT",
+        )
     if data.duration not in BINARY_TRADE_PROFIT_RATES:
         raise HTTPException(status_code=400, detail="Duration must be 300, 600, 900 or 1200 seconds")
 
