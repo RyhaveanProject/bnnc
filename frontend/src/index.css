@@ -638,10 +638,50 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   }
 
   /* Deposit page mobile fixes */
-  .dep-page { padding: 14px !important; }
+  .dep-page { padding: 12px !important; max-width: 100% !important; }
+  .dep-page > div[style*="grid-template-columns"] { gap: 12px !important; }
   .dep-wallet-row { gap: 6px !important; }
   .dep-wallet-input { font-size: 11px !important; }
-  .dep-qr, .dep-qr-wrap { max-width: 90vw !important; }
+  .dep-qr, .dep-qr-wrap { max-width: 80vw !important; }
+  /* Withdraw page mobile fixes */
+  [data-testid="withdraw-page"] {
+    padding: 12px !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+  [data-testid="withdraw-page"] > div[style*="grid-template-columns"] { gap: 12px !important; }
+  /* Both deposit and withdraw: ensure panels never overflow viewport */
+  [data-testid="deposit-page"] .panel,
+  [data-testid="withdraw-page"] .panel {
+    padding: 14px !important;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  [data-testid="deposit-page"] .panel form,
+  [data-testid="withdraw-page"] .panel form { max-width: 100%; }
+  [data-testid="deposit-page"] .input,
+  [data-testid="withdraw-page"] .input {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    font-size: 13px;
+  }
+  [data-testid="deposit-page"] .btn,
+  [data-testid="withdraw-page"] .btn {
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    word-break: break-word;
+  }
+  /* Coin selector chips wrap nicely */
+  [data-testid="deposit-page"] .btn-sm,
+  [data-testid="withdraw-page"] .btn-sm {
+    flex: 1 1 60px;
+    min-width: 60px;
+    padding: 10px 6px;
+    font-size: 12px;
+  }
 
   /* Binary trade — Buy Up / Buy Down stay readable */
   .bt-buybtn { font-size: 16px !important; padding: 18px 0 !important; }
