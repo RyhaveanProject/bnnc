@@ -247,6 +247,7 @@ export default function BinaryTrade() {
               color={chartColor}
               width={820}
               height={180}
+              responsive
             />
           </div>
 
@@ -297,7 +298,7 @@ export default function BinaryTrade() {
 
           {/* Amount */}
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Amount (USDT)</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
+          <div className="bt-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
             {AMOUNTS.map((a) => {
               const active = amount === a;
               const disabled = usdtBalance < a;
@@ -329,7 +330,7 @@ export default function BinaryTrade() {
 
           {/* Duration */}
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Duration</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 24 }}>
+          <div className="bt-duration-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 24 }}>
             {DURATIONS.map((d) => {
               const active = duration === d.seconds;
               return (
@@ -394,39 +395,43 @@ export default function BinaryTrade() {
               onClick={() => placeTrade("rise")}
               disabled={busy || !!activeTrade || usdtBalance < amount}
               data-testid="buy-up-btn"
+              className="bt-buybtn bt-buyup"
               style={{
-                padding: "18px 0",
-                borderRadius: 10,
+                padding: "20px 0",
+                borderRadius: 12,
                 border: "none",
-                background: "var(--color-green)",
                 color: "#fff",
-                fontSize: 16,
-                fontWeight: 700,
+                fontSize: 17,
+                fontWeight: 800,
+                letterSpacing: 0.5,
                 cursor: busy || activeTrade ? "not-allowed" : "pointer",
-                opacity: busy || activeTrade || usdtBalance < amount ? 0.6 : 1,
-                transition: "all 0.15s",
+                opacity: busy || activeTrade || usdtBalance < amount ? 0.5 : 1,
+                transition: "all 0.18s ease",
+                textShadow: "0 1px 2px rgba(0,0,0,0.2)",
               }}
             >
-              ▲ Buy Up
+              ▲ Yüksək Al (Buy Up)
             </button>
             <button
               onClick={() => placeTrade("fall")}
               disabled={busy || !!activeTrade || usdtBalance < amount}
               data-testid="buy-down-btn"
+              className="bt-buybtn bt-buydown"
               style={{
-                padding: "18px 0",
-                borderRadius: 10,
+                padding: "20px 0",
+                borderRadius: 12,
                 border: "none",
-                background: "var(--color-red)",
                 color: "#fff",
-                fontSize: 16,
-                fontWeight: 700,
+                fontSize: 17,
+                fontWeight: 800,
+                letterSpacing: 0.5,
                 cursor: busy || activeTrade ? "not-allowed" : "pointer",
-                opacity: busy || activeTrade || usdtBalance < amount ? 0.6 : 1,
-                transition: "all 0.15s",
+                opacity: busy || activeTrade || usdtBalance < amount ? 0.5 : 1,
+                transition: "all 0.18s ease",
+                textShadow: "0 1px 2px rgba(0,0,0,0.2)",
               }}
             >
-              ▼ Buy Down
+              ▼ Düşüş Al (Buy Down)
             </button>
           </div>
         </div>
