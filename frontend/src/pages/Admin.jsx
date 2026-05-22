@@ -166,6 +166,15 @@ function Users() {
     catch (e) { setMsg(formatErr(e)); }
   };
 
+  const toggleTrading = async (id) => {
+    try {
+      const res = await api.post(`/admin/users/${id}/toggle-trading`);
+      setMsg(`Trading ${res.data.trading_enabled ? "enabled" : "disabled"}.`);
+      setTimeout(() => setMsg(""), 3000);
+      load();
+    } catch (e) { setMsg(formatErr(e)); }
+  };
+
   const onUpdated = (updatedUser) => {
     setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
     setMsg(t("admin.balance_updated", { name: updatedUser.username }));
@@ -190,7 +199,7 @@ function Users() {
           <thead>
             <tr>
               <th>{t("admin.email")}</th><th>{t("admin.username")}</th><th>{t("admin.role")}</th>
-              <th>{t("admin.balances")}</th><th>{t("admin.status")}</th><th>{t("admin.actions")}</th>
+              <th>{t("admin.balances")}</th><th>{t("admin.status")}</th><th>Trading</th><th>{t("admin.actions")}</th>
             </tr>
           </thead>
           <tbody>
