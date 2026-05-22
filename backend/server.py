@@ -619,6 +619,50 @@ async def me(user: dict = Depends(get_current_user)):
     return user
 
 
+# ============ TOTAL BALANCE (USDT equivalent) ============
+_BALANCE_CACHE = {"user_id": None, "total": 0.0, "ts": 0.0}
+_BALANCE_TTL = 10.0
+
+
+@api.get("/balance/total")
+async def get_total_balance(user: dict = Depends(get_current_user)):
+    """Return total balance in USDT equivalent, updated every 10 seconds."""
+    now = time.time()
+    if (_BALANCE_CACHE["user_id"] == user["id"] and 
+        _BALANCE_CACHE["total"] > 0 and 
+        now - _BALANCE_CACHE["ts"] < _BALANCE_TTL):
+        return {"total_usdt": _BALANCE_CACHE["total"]}
+    
+    # Get user's current balances
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "balances": 1})
+    if not u:
+        return {"total_usdt": 0.0}
+    
+    balances = u.get("balances", {})
+    total_usdt = 0.0
+    
+    # Convert each currency to USDT
+    for currency, amount in balances.items():
+        if amount <= 0:
+            continue
+        if currency == "USDT":
+            total_usdt += float(amount)
+        else:
+            try:
+                price = await _live_price(currency)
+                total_usdt += float(amount) * price
+            except Exception as e:
+                logger.warning(f"Failed to get price for {currency}: {e}")
+                continue
+    
+    # Update cache
+    _BALANCE_CACHE["user_id"] = user["id"]
+    _BALANCE_CACHE["total"] = total_usdt
+    _BALANCE_CACHE["ts"] = now
+    
+    return {"total_usdt": round(total_usdt, 2)}
+
+
 # ============ MARKET (KuCoin) ============
 _MARKET_CACHE = {"data": [], "ts": 0.0, "lock": asyncio.Lock()}
 _MARKET_TTL = 15.0
