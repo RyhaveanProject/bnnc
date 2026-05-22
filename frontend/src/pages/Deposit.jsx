@@ -144,7 +144,7 @@ export default function Deposit() {
   };
 
   return (
-    <div data-testid="deposit-page" style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }} className="container-pad">
+    <div data-testid="deposit-page" className="dep-page container-pad" style={{ maxWidth: 1100, margin: "0 auto" }}>
       <h1 style={{ margin: "0 0 24px" }}>{t("deposit.title")}</h1>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }} className="dep-grid">
         <div className="panel" style={{ padding: 24 }}>
@@ -162,20 +162,22 @@ export default function Deposit() {
                 <input className="input" type="number" step="any" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} required data-testid="dep-amount"/>
                 <div style={{ height: 14 }} />
                 <label className="lbl">{t("deposit.wallet_address", { network: wallet?.network || currency })}</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input className="input" value={wallet?.address || ""} readOnly data-testid="dep-wallet"/>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={copy} data-testid="dep-copy">
+                <div className="dep-wallet-row" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <input className="input dep-wallet-input" value={wallet?.address || ""} readOnly data-testid="dep-wallet"
+                    style={{ flex: 1, minWidth: 0, fontSize: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}/>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={copy} data-testid="dep-copy" style={{ flexShrink: 0 }}>
                     {copied ? t("common.copied") : t("common.copy")}
                   </button>
                 </div>
                 <div style={{ marginTop: 18, display: "flex", justifyContent: "center" }}>
                   {wallet?.qr_image_b64 ? (
                     <img src={wallet.qr_image_b64} alt="qr"
-                      style={{ width: 180, height: 180, background: "#fff", padding: 6, borderRadius: 8 }}
+                      className="dep-qr"
+                      style={{ width: 180, maxWidth: "100%", height: "auto", background: "#fff", padding: 6, borderRadius: 8 }}
                       data-testid="dep-qr-img"/>
                   ) : wallet?.address ? (
-                    <div style={{ background: "#fff", padding: 10, borderRadius: 8 }} data-testid="dep-qr-gen">
-                      <QRCodeSVG value={wallet.address} size={180} />
+                    <div className="dep-qr-wrap" style={{ background: "#fff", padding: 10, borderRadius: 8, maxWidth: "100%" }} data-testid="dep-qr-gen">
+                      <QRCodeSVG value={wallet.address} size={180} style={{ width: "100%", height: "auto", maxWidth: 180, display: "block" }} />
                     </div>
                   ) : (
                     <div className="text-dim">{t("deposit.wallet_not_configured")}</div>
