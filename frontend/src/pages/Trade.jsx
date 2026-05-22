@@ -101,10 +101,8 @@ export default function Trade() {
               {(coin?.change24h ?? 0) >= 0 ? "+" : ""}{(coin?.change24h ?? 0).toFixed(2)}%
             </div>
           </div>
-          <div style={{marginTop:16, padding:"16px 0"}}>
-            <svg viewBox="0 0 600 200" width="100%" height="200">
-              {coin && <Sparkline points={coin.sparkline} width={600} height={200} color={coin.change24h>=0?"#0ecb81":"#f6465d"} />}
-            </svg>
+          <div style={{marginTop:16, padding:"16px 0", height:200}}>
+            {coin && <Sparkline points={coin.sparkline} width={600} height={200} color={coin.change24h>=0?"#0ecb81":"#f6465d"} responsive />}
           </div>
           <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, marginTop:8}}>
             <Stat label={t("trade.stat_24h_volume")} value={`$${fmtMoney(coin?.volume24h ?? 0, 0)}`} />
