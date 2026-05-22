@@ -14,6 +14,10 @@
   --yellow-2: #fcd535;
   --green: #0ecb81;
   --red: #f6465d;
+  /* Aliases used across pages (BinaryTrade, etc.) */
+  --color-green: #0ecb81;
+  --color-red: #f6465d;
+  --color-accent: #f0b90b;
 }
 
 * { box-sizing: border-box; }
@@ -92,10 +96,54 @@ table.tbl tr:hover td { background: #1a1f27; }
   .container-pad { padding: 14px !important; }
   .hero-grid { grid-template-columns: 1fr !important; }
   table.tbl th, table.tbl td { padding: 10px 8px; font-size: 13px; }
+
+  /* Make buttons more tap-friendly on mobile */
+  .btn { padding: 12px 18px; font-size: 14px; }
+  .btn-sm { padding: 8px 12px; font-size: 13px; }
+
+  /* Prevent horizontal scroll on mobile */
+  body, #root, .App { overflow-x: hidden; }
 }
 @media (min-width: 769px) {
   .show-mobile { display:none !important; }
 }
+
+/* ===== Mobile-optimised TRADING page (binary + spot) ===== */
+@media (max-width: 880px) {
+  .bt-grid { grid-template-columns: 1fr !important; gap: 14px !important; }
+  .bt-grid .panel { padding: 16px !important; }
+  .bt-amount-grid, .bt-duration-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .bt-buybtn {
+    padding: 20px 0 !important;
+    font-size: 18px !important;
+    border-radius: 12px !important;
+  }
+  .bt-active-time { font-size: 32px !important; }
+}
+
+/* Vibrant gradient trading buttons (Buy Up / Buy Down) */
+.bt-buyup {
+  background: linear-gradient(135deg, #0ecb81 0%, #03a66d 100%) !important;
+  box-shadow: 0 4px 16px rgba(14, 203, 129, 0.35);
+}
+.bt-buyup:hover:not(:disabled) {
+  background: linear-gradient(135deg, #14d68b 0%, #05b878 100%) !important;
+  box-shadow: 0 6px 22px rgba(14, 203, 129, 0.5);
+  transform: translateY(-1px);
+}
+.bt-buydown {
+  background: linear-gradient(135deg, #f6465d 0%, #d4314a 100%) !important;
+  box-shadow: 0 4px 16px rgba(246, 70, 93, 0.35);
+}
+.bt-buydown:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff5c72 0%, #e63b58 100%) !important;
+  box-shadow: 0 6px 22px rgba(246, 70, 93, 0.5);
+  transform: translateY(-1px);
+}
+.bt-buyup:active:not(:disabled),
+.bt-buydown:active:not(:disabled) { transform: translateY(1px); }
 
 /* mobile drawer */
 .mobile-drawer {
