@@ -34,12 +34,23 @@ export function useMarket(interval = 6000) {
   return { data, flash };
 }
 
-export function Sparkline({ points, color = "#0ecb81", width = 96, height = 32 }) {
-  if (!points || points.length < 2) return <svg width={width} height={height} />;
+export function Sparkline({ points, color = "#0ecb81", width = 96, height = 32, responsive = false }) {
+  if (!points || points.length < 2) {
+    return responsive
+      ? <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }} />
+      : <svg width={width} height={height} />;
+  }
   const min = Math.min(...points), max = Math.max(...points);
   const range = max - min || 1;
   const step = width / (points.length - 1);
   const d = points.map((p, i) => `${i === 0 ? "M" : "L"} ${i * step} ${height - ((p - min) / range) * height}`).join(" ");
+  if (responsive) {
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
+        <path d={d} className="spark" stroke={color} />
+      </svg>
+    );
+  }
   return (
     <svg width={width} height={height}>
       <path d={d} className="spark" stroke={color} />
