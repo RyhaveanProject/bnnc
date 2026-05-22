@@ -20,6 +20,7 @@ export default function Navbar() {
       <Link to="/markets" className={cls("/markets")} data-testid="nav-markets" onClick={close}>{t("nav.markets")}</Link>
       {user && user.role !== "admin" && <>
         <Link to="/trade" className={cls("/trade")} data-testid="nav-trade" onClick={close}>{t("nav.trade")}</Link>
+        <Link to="/trading" className={cls("/trading")} data-testid="nav-trading" onClick={close}>Trading</Link>
         <Link to="/deposit" className={cls("/deposit")} data-testid="nav-deposit" onClick={close}>{t("nav.deposit")}</Link>
         <Link to="/withdraw" className={cls("/withdraw")} data-testid="nav-withdraw" onClick={close}>{t("nav.withdraw")}</Link>
         <Link to="/history" className={cls("/history")} data-testid="nav-history" onClick={close}>{t("nav.history")}</Link>
