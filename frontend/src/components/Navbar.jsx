@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../lib/auth";
 import LanguageSelector from "./LanguageSelector";
+import TotalBalance from "./TotalBalance";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -41,6 +42,8 @@ export default function Navbar() {
         </nav>
       </div>
       <div style={{display:"flex", gap:10, alignItems:"center"}}>
+        {/* Total Balance - visible on all pages except login/register */}
+        {user && loc.pathname !== "/login" && loc.pathname !== "/register" && <TotalBalance />}
         {/* Language selector - always visible top-right */}
         <LanguageSelector />
         {!user ? (
