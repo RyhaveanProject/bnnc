@@ -44,8 +44,10 @@ export default function Navbar() {
       <div className="nav-right">
         {/* Total Balance - visible on all pages except login/register */}
         {user && loc.pathname !== "/login" && loc.pathname !== "/register" && <TotalBalance />}
-        {/* Language selector - always visible top-right */}
-        <LanguageSelector />
+        {/* Language selector - only on desktop; mobile users get it inside the drawer */}
+        <span className="hide-mobile">
+          <LanguageSelector />
+        </span>
         {!user ? (
           <>
             <Link to="/login"><button className="btn btn-ghost btn-sm hide-mobile" data-testid="login-btn">{t("nav.login")}</button></Link>
@@ -75,6 +77,11 @@ export default function Navbar() {
         <div className="show-mobile mobile-drawer" data-testid="mobile-drawer">
           <div className="mobile-drawer-content">
             {userLinks}
+            {/* Language selector inside the mobile drawer */}
+            <div className="mobile-lang-row" data-testid="mobile-language-row">
+              <span className="mobile-lang-label">{t("lang.select", "Language")}</span>
+              <LanguageSelector />
+            </div>
             {!user ? (
               <div className="mobile-auth-buttons">
                 <Link to="/login" onClick={close}>
