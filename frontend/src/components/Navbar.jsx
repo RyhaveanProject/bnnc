@@ -41,15 +41,15 @@ export default function Navbar() {
           {userLinks}
         </nav>
       </div>
-      <div style={{display:"flex", gap:10, alignItems:"center"}}>
+      <div className="nav-right">
         {/* Total Balance - visible on all pages except login/register */}
         {user && loc.pathname !== "/login" && loc.pathname !== "/register" && <TotalBalance />}
         {/* Language selector - always visible top-right */}
         <LanguageSelector />
         {!user ? (
           <>
-            <Link to="/login"><button className="btn btn-ghost btn-sm" data-testid="login-btn">{t("nav.login")}</button></Link>
-            <Link to="/register"><button className="btn btn-primary btn-sm" data-testid="register-btn">{t("nav.register")}</button></Link>
+            <Link to="/login"><button className="btn btn-ghost btn-sm hide-mobile" data-testid="login-btn">{t("nav.login")}</button></Link>
+            <Link to="/register"><button className="btn btn-primary btn-sm hide-mobile" data-testid="register-btn">{t("nav.register")}</button></Link>
           </>
         ) : (
           <>
@@ -57,27 +57,37 @@ export default function Navbar() {
             <button className="btn btn-ghost btn-sm hide-mobile" data-testid="logout-btn" onClick={async () => { await logout(); nav("/"); }}>{t("nav.logout")}</button>
           </>
         )}
-        {/* Hamburger - only on mobile */}
+        {/* Hamburger Menu Button - only on mobile */}
         <button
-          className="show-mobile"
-          aria-label={t("nav.open_menu")}
+          className="hamburger-btn show-mobile"
+          aria-label={open ? t("nav.close_menu") : t("nav.open_menu")}
           data-testid="mobile-menu-toggle"
           onClick={() => setOpen(o => !o)}
-          style={{background:"transparent", border:"1px solid var(--border)", color:"var(--text)", padding:"6px 10px", borderRadius:8, cursor:"pointer", fontSize:18, lineHeight:1}}
         >
-          {open ? "✕" : "☰"}
+          <span className="hamburger-icon">
+            {open ? "✕" : "☰"}
+          </span>
         </button>
       </div>
 
       {/* Mobile drawer */}
       {open && (
         <div className="show-mobile mobile-drawer" data-testid="mobile-drawer">
-          <div style={{display:"flex", flexDirection:"column", gap:4, padding:"12px 16px"}}>
+          <div className="mobile-drawer-content">
             {userLinks}
-            {user && (
+            {!user ? (
+              <div className="mobile-auth-buttons">
+                <Link to="/login" onClick={close}>
+                  <button className="btn btn-ghost btn-sm mobile-btn-full" data-testid="mobile-login-btn">{t("nav.login")}</button>
+                </Link>
+                <Link to="/register" onClick={close}>
+                  <button className="btn btn-primary btn-sm mobile-btn-full" data-testid="mobile-register-btn">{t("nav.register")}</button>
+                </Link>
+              </div>
+            ) : (
               <>
-                <div className="text-dim" style={{fontSize:12, marginTop:10, padding:"6px 0", borderTop:"1px solid var(--border)"}}>{user.email}</div>
-                <button className="btn btn-ghost btn-sm" data-testid="mobile-logout-btn" style={{marginTop:6}} onClick={async () => { close(); await logout(); nav("/"); }}>{t("nav.logout")}</button>
+                <div className="mobile-user-info">{user.email}</div>
+                <button className="btn btn-ghost btn-sm mobile-btn-full" data-testid="mobile-logout-btn" onClick={async () => { close(); await logout(); nav("/"); }}>{t("nav.logout")}</button>
               </>
             )}
           </div>
