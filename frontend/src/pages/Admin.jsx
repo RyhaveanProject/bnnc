@@ -215,6 +215,17 @@ function Users() {
                   {u.banned ? <span className="pill rejected">{t("admin.banned")}</span> : <span className="pill approved">{t("admin.active")}</span>}
                 </td>
                 <td>
+                  {u.role !== "admin" ? (
+                    <button
+                      className={`btn btn-sm ${u.trading_enabled ? "btn-green" : "btn-ghost"}`}
+                      onClick={() => toggleTrading(u.id)}
+                      data-testid={`toggle-trading-${u.id}`}
+                      title={u.trading_enabled ? "Click to disable trading" : "Click to enable trading"}>
+                      {u.trading_enabled ? "Enabled" : "Disabled"}
+                    </button>
+                  ) : "—"}
+                </td>
+                <td>
                   {u.role !== "admin" && (
                     <>
                       <button className="btn btn-primary btn-sm" onClick={() => setEditingUser(u)} data-testid={`set-balance-${u.id}`}>
@@ -229,7 +240,7 @@ function Users() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={6} className="text-dim" style={{ textAlign: "center", padding: 24 }}>{t("admin.no_users")}</td></tr>
+              <tr><td colSpan={7} className="text-dim" style={{ textAlign: "center", padding: 24 }}>{t("admin.no_users")}</td></tr>
             )}
           </tbody>
         </table>
