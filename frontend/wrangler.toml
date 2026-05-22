@@ -1,0 +1,30 @@
+# wrangler.toml — Cloudflare Workers configuration for ADX DUBAI frontend.
+#
+# Two deployment paths are supported. Pick ONE:
+#
+# ----------------------------------------------------------------------------
+# (A) Cloudflare PAGES (recommended)  →  https://dash.cloudflare.com → Pages
+# ----------------------------------------------------------------------------
+#   Build command:           yarn install && yarn build
+#   Build output directory:  frontend/build
+#   Root directory:          /
+#   The `frontend/public/_redirects` + `frontend/public/_headers` files
+#   (already in the repo) handle SPA routing automatically once the site
+#   is built. No worker code is needed for this path.
+#
+# ----------------------------------------------------------------------------
+# (B) Cloudflare WORKERS with Assets binding (your current workers.dev URL)
+# ----------------------------------------------------------------------------
+#   `wrangler deploy` from inside /frontend after building.
+
+name = "adxsite"
+main = "_worker.js"
+compatibility_date = "2024-11-01"
+
+# Bind the built React app as static assets. The `_worker.js` next to this file
+# intercepts requests and returns /index.html for any path that isn't a real
+# asset — this is what stops refresh from downloading a .txt file.
+[assets]
+directory = "./build"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
