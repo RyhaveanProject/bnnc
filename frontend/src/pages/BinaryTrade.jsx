@@ -32,7 +32,7 @@ return ( <div data-testid="binary-trade-page" style={{ maxWidth: 900, margin: "0
       fontSize: 13,
       color: "var(--color-red)"
     }}>
-      <strong>Trading is risky — if you don’t take risks, you can’t make profits
+      <strong>Trading is risky — if you don’t take risks, you can’t make profits</strong>
     </div>
   )}
 
