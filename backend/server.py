@@ -1452,4 +1452,142 @@ async def root():
     return {"name": "ADX DUBAI API", "status": "ok"}
 
 
+
+
+# ============ BINARY TRADING ============
+BINARY_TRADE_PROFIT_RATES = {300: 0.05, 600: 0.07, 900: 0.09, 1200: 0.12}
+BINARY_TRADE_ALLOWED_AMOUNTS = {1000.0, 5000.0, 10000.0, 50000.0}
+
+
+class BinaryTradePlaceIn(BaseModel):
+    symbol: str
+    amount_usd: float = Field(gt=0)
+    duration: int  # 300 / 600 / 900 / 1200 seconds
+    direction: Literal["rise", "fall"]
+
+
+@api.post("/binary-trade/place")
+async def binary_trade_place(data: BinaryTradePlaceIn, user: dict = Depends(get_current_user)):
+    sym = data.symbol.upper()
+    if sym not in TRADING_PAIRS:
+        raise HTTPException(status_code=400, detail="Invalid symbol")
+    if data.amount_usd not in BINARY_TRADE_ALLOWED_AMOUNTS:
+        raise HTTPException(status_code=400, detail="Amount must be 1000, 5000, 10000 or 50000 USDT")
+    if data.duration not in BINARY_TRADE_PROFIT_RATES:
+        raise HTTPException(status_code=400, detail="Duration must be 300, 600, 900 or 1200 seconds")
+
+    bal = user.get("balances", {})
+    usdt_bal = float(bal.get("USDT", 0))
+    if usdt_bal < data.amount_usd:
+        raise HTTPException(status_code=400, detail="Insufficient USDT balance")
+
+    profit_rate = BINARY_TRADE_PROFIT_RATES[data.duration]
+    now_dt = datetime.now(timezone.utc)
+    expires_at = now_dt + timedelta(seconds=data.duration)
+
+    res = await db.users.update_one(
+        {"id": user["id"], "balances.USDT": {"$gte": data.amount_usd}},
+        {"$inc": {"balances.USDT": -data.amount_usd}},
+    )
+    if res.modified_count == 0:
+        raise HTTPException(status_code=400, detail="Insufficient USDT balance")
+
+    entry_price = 0.0
+    try:
+        entry_price = await _live_price(sym)
+    except Exception:
+        pass
+
+    trade = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "symbol": sym,
+        "direction": data.direction,
+        "amount_usd": data.amount_usd,
+        "duration": data.duration,
+        "profit_rate": profit_rate,
+        "entry_price": entry_price,
+        "status": "active",
+        "created_at": now_dt.isoformat(),
+        "expires_at": expires_at.isoformat(),
+        "completed_at": None,
+        "profit": None,
+        "payout": None,
+        "result": None,
+    }
+    await db.binary_trades.insert_one(trade)
+    trade_view = {k: v for k, v in trade.items() if k != "_id"}
+    return {"trade": trade_view}
+
+
+@api.post("/binary-trade/complete/{trade_id}")
+async def binary_trade_complete(trade_id: str, user: dict = Depends(get_current_user)):
+    trade = await db.binary_trades.find_one({"id": trade_id, "user_id": user["id"]}, {"_id": 0})
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    if trade["status"] != "active":
+        raise HTTPException(status_code=400, detail=f"Trade already {trade['status']}")
+
+    expires_at = parse_iso(trade["expires_at"])
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    now_dt = datetime.now(timezone.utc)
+    if now_dt < expires_at:
+        wait_sec = int((expires_at - now_dt).total_seconds())
+        raise HTTPException(status_code=400, detail=f"Trade not yet expired. {wait_sec}s remaining.")
+
+    db_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    trading_enabled = bool(db_user.get("trading_enabled", False))
+
+    amount = float(trade["amount_usd"])
+    profit_rate = float(trade["profit_rate"])
+
+    if trading_enabled:
+        payout = round(amount * (1.0 + profit_rate), 8)
+        profit = round(amount * profit_rate, 8)
+        result = "win"
+    else:
+        payout = 0.0
+        profit = -amount
+        result = "loss"
+
+    if payout > 0:
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$inc": {"balances.USDT": payout}},
+        )
+
+    await db.binary_trades.update_one(
+        {"id": trade_id},
+        {"$set": {
+            "status": "completed",
+            "completed_at": now_dt.isoformat(),
+            "profit": profit,
+            "payout": payout,
+            "result": result,
+            "trading_enabled_at_completion": trading_enabled,
+        }},
+    )
+
+    updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    return {"ok": True, "result": result, "payout": payout, "profit": profit, "user": updated_user}
+
+
+@api.get("/binary-trade/history")
+async def binary_trade_history(user: dict = Depends(get_current_user)):
+    rows = await db.binary_trades.find(
+        {"user_id": user["id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    return rows
+
+
+@api.post("/admin/users/{user_id}/toggle-trading")
+async def admin_toggle_trading(user_id: str, admin: dict = Depends(require_admin)):
+    u = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    new_val = not bool(u.get("trading_enabled", False))
+    await db.users.update_one({"id": user_id}, {"$set": {"trading_enabled": new_val}})
+    return {"ok": True, "trading_enabled": new_val}
+
 app.include_router(api)
