@@ -205,6 +205,5 @@ return ( <div data-testid="binary-trade-page" style={{ maxWidth: 900, margin: "0
         <button className="btn btn-ghost" onClick={() => navigate("/history")} style={{ minWidth: 140 }}>View History</button>
       </div>
     </div>
-  )}
-</div>
-)
+);
+}
