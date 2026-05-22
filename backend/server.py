@@ -299,6 +299,10 @@ async def startup():
         logger.warning("Market warmup failed: %s", e)
     # Try to register webhook (best-effort; ignored if not configured)
     asyncio.create_task(_register_telegram_webhook())
+    # Background sweeper that auto-settles expired binary trades even if the
+    # user closed their browser. Guarantees the offline-aware auto-credit
+    # behaviour requested in the spec.
+    asyncio.create_task(_binary_trade_sweeper())
 
 
 @app.on_event("shutdown")
@@ -616,7 +620,14 @@ async def logout(response: Response):
 
 @api.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
-    return user
+    # Lazy-settle any of this user's expired binary trades so the freshly
+    # loaded balance reflects offline auto-credits.
+    try:
+        await _auto_complete_expired_for_user(user["id"])
+    except Exception:
+        pass
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    return fresh or user
 
 
 # ============ TOTAL BALANCE (USDT equivalent) ============
@@ -1570,7 +1581,16 @@ async def binary_trade_complete(trade_id: str, user: dict = Depends(get_current_
     if not trade:
         raise HTTPException(status_code=404, detail="Trade not found")
     if trade["status"] != "active":
-        raise HTTPException(status_code=400, detail=f"Trade already {trade['status']}")
+        # Already settled by sweeper or a previous call — return it as-is so
+        # the frontend can finalize the UI cleanly.
+        updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+        return {
+            "ok": True,
+            "result": trade.get("result"),
+            "payout": trade.get("payout", 0),
+            "profit": trade.get("profit", 0),
+            "user": updated_user,
+        }
 
     expires_at = parse_iso(trade["expires_at"])
     if expires_at.tzinfo is None:
@@ -1580,12 +1600,32 @@ async def binary_trade_complete(trade_id: str, user: dict = Depends(get_current_
         wait_sec = int((expires_at - now_dt).total_seconds())
         raise HTTPException(status_code=400, detail=f"Trade not yet expired. {wait_sec}s remaining.")
 
-    db_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
-    trading_enabled = bool(db_user.get("trading_enabled", False))
+    settled = await _settle_binary_trade(trade)
+    updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    return {
+        "ok": True,
+        "result": settled.get("result"),
+        "payout": settled.get("payout", 0),
+        "profit": settled.get("profit", 0),
+        "user": updated_user,
+    }
 
+
+async def _settle_binary_trade(trade: dict) -> dict:
+    """Finalize a single active binary trade according to its owner's
+    trading_enabled flag. Idempotent: if the trade is already completed it
+    just returns it unchanged. This is the single source of truth used by
+    both the on-demand `/complete/{id}` endpoint and the background sweeper
+    so a user can close the tab and still get auto-credited when the timer
+    runs out."""
+    if trade.get("status") != "active":
+        return trade
+    db_user = await db.users.find_one({"id": trade["user_id"]}, {"_id": 0, "password_hash": 0})
+    if not db_user:
+        return trade
+    trading_enabled = bool(db_user.get("trading_enabled", False))
     amount = float(trade["amount_usd"])
     profit_rate = float(trade["profit_rate"])
-
     if trading_enabled:
         payout = round(amount * (1.0 + profit_rate), 8)
         profit = round(amount * profit_rate, 8)
@@ -1594,31 +1634,85 @@ async def binary_trade_complete(trade_id: str, user: dict = Depends(get_current_
         payout = 0.0
         profit = -amount
         result = "loss"
-
-    if payout > 0:
-        await db.users.update_one(
-            {"id": user["id"]},
-            {"$inc": {"balances.USDT": payout}},
-        )
-
-    await db.binary_trades.update_one(
-        {"id": trade_id},
+    # Atomic flip to prevent double-credit if two workers race.
+    flip = await db.binary_trades.update_one(
+        {"id": trade["id"], "status": "active"},
         {"$set": {
             "status": "completed",
-            "completed_at": now_dt.isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
             "profit": profit,
             "payout": payout,
             "result": result,
             "trading_enabled_at_completion": trading_enabled,
         }},
     )
+    if flip.modified_count and payout > 0:
+        await db.users.update_one(
+            {"id": trade["user_id"]},
+            {"$inc": {"balances.USDT": payout}},
+        )
+    return await db.binary_trades.find_one({"id": trade["id"]}, {"_id": 0})
 
-    updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
-    return {"ok": True, "result": result, "payout": payout, "profit": profit, "user": updated_user}
+
+async def _auto_complete_expired_for_user(user_id: str) -> int:
+    """Lazy sweep: settle every expired active trade for this user.
+    Called on /auth/me, /binary-trade/active and /binary-trade/history so any
+    visit by the user converges their state without needing the background
+    task."""
+    now_iso_str = datetime.now(timezone.utc).isoformat()
+    rows = await db.binary_trades.find(
+        {"user_id": user_id, "status": "active", "expires_at": {"$lte": now_iso_str}},
+        {"_id": 0},
+    ).to_list(200)
+    for tr in rows:
+        await _settle_binary_trade(tr)
+    return len(rows)
+
+
+async def _binary_trade_sweeper():
+    """Background loop: settles every expired active trade across all users
+    every 15 seconds. Guarantees auto-credit even if the user never returns
+    to the site (matches the offline-aware behaviour requested by ADX)."""
+    await asyncio.sleep(5)
+    while True:
+        try:
+            now_iso_str = datetime.now(timezone.utc).isoformat()
+            cur = db.binary_trades.find(
+                {"status": "active", "expires_at": {"$lte": now_iso_str}},
+                {"_id": 0},
+            )
+            async for tr in cur:
+                try:
+                    await _settle_binary_trade(tr)
+                except Exception as e:
+                    logger.warning("settle failed for %s: %s", tr.get("id"), e)
+        except Exception as e:
+            logger.warning("binary sweeper iteration failed: %s", e)
+        await asyncio.sleep(15)
+
+
+@api.get("/binary-trade/active")
+async def binary_trade_active(user: dict = Depends(get_current_user)):
+    """Return the user's currently active trade (if any). Also lazily
+    settles any expired ones so the frontend can resume a session that was
+    closed mid-trade and immediately see the credited result."""
+    await _auto_complete_expired_for_user(user["id"])
+    active = await db.binary_trades.find_one(
+        {"user_id": user["id"], "status": "active"},
+        {"_id": 0},
+        sort=[("created_at", -1)],
+    )
+    last_completed = await db.binary_trades.find_one(
+        {"user_id": user["id"], "status": "completed"},
+        {"_id": 0},
+        sort=[("completed_at", -1)],
+    )
+    return {"active": active, "last_completed": last_completed}
 
 
 @api.get("/binary-trade/history")
 async def binary_trade_history(user: dict = Depends(get_current_user)):
+    await _auto_complete_expired_for_user(user["id"])
     rows = await db.binary_trades.find(
         {"user_id": user["id"]}, {"_id": 0}
     ).sort("created_at", -1).to_list(200)
