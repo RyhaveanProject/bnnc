@@ -2,6 +2,17 @@ import React, { useEffect, useState } from "react";
 import api from "../lib/api";
 import { useAuth } from "../lib/auth";
 
+// Helper function to format large numbers
+function formatBalance(num) {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + "M";
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + "K";
+  }
+  return num.toFixed(2);
+}
+
 export default function TotalBalance() {
   const { user } = useAuth();
   const [total, setTotal] = useState(0);
@@ -38,26 +49,16 @@ export default function TotalBalance() {
 
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "6px 12px",
-        background: "rgba(240, 185, 11, 0.1)",
-        border: "1px solid rgba(240, 185, 11, 0.3)",
-        borderRadius: 8,
-        fontSize: 13,
-        fontWeight: 600,
-      }}
+      className="total-balance-container"
       data-testid="total-balance"
     >
-      <span className="text-dim" style={{ fontSize: 11 }}>
+      <span className="balance-label">
         BALANCE
       </span>
-      <span style={{ color: "var(--color-accent)" }}>
-        {loading ? "..." : `$${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+      <span className="balance-amount">
+        {loading ? "..." : `$${formatBalance(total)}`}
       </span>
-      <span style={{ fontSize: 11, opacity: 0.7 }}>USDT</span>
+      <span className="balance-currency">USDT</span>
     </div>
   );
 }
