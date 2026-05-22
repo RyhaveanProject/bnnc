@@ -9,8 +9,8 @@ import { useAuth } from "../lib/auth";
 export default function Landing() {
   const { user } = useAuth();
   const { t } = useTranslation();
-  const ctaTarget = user ? "/trade" : "/register";
-  const ctaLabel = user ? t("landing.go_to_trading") : t("landing.start_trading");
+  const ctaTarget = user ? "/trading" : "/register";
+  const ctaLabel = user ? "Trading" : t("landing.start_trading");
 
   return (
     <div className="hero-bg" data-testid="landing-page">
