@@ -13,6 +13,7 @@ import Withdraw from "./pages/Withdraw";
 import History from "./pages/History";
 import Support from "./pages/Support";
 import Admin from "./pages/Admin";
+import BinaryTrade from "./pages/BinaryTrade";
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
@@ -53,6 +54,7 @@ function Shell() {
         <Route path="/withdraw" element={<ProtectedRoute><Withdraw /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
+        <Route path="/trading" element={<ProtectedRoute><BinaryTrade /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
