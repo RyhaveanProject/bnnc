@@ -29,7 +29,11 @@ export default function BinaryTrade() {
   const navigate = useNavigate();
 
   const [symbol, setSymbol] = useState("BTC");
-  const [amount, setAmount] = useState(1000);
+  // Use string state so the input can be cleared/edited freely without a
+  // lingering "0" sticking around. Numeric value is derived via `amount`.
+  const [amountStr, setAmountStr] = useState("");
+  const amount = Number(amountStr) || 0;
+  const setAmount = (v) => setAmountStr(v === "" || v == null ? "" : String(v));
   const [duration, setDuration] = useState(300);
   const [activeTrade, setActiveTrade] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -328,7 +332,7 @@ export default function BinaryTrade() {
             })}
           </div>
 
-          {/* Manual amount input — min $1,000, max $100,000 */}
+          {/* Manual amount input — accepts any positive amount up to your balance */}
           <div className="bt-manual-row" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, flexShrink: 0 }}>
               Manual
@@ -337,30 +341,20 @@ export default function BinaryTrade() {
               <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", fontWeight: 700, pointerEvents: "none" }}>$</span>
               <input
                 type="number"
-                min={1000}
-                max={100000}
-                step={100}
-                value={amount}
+                min={1}
+                step="any"
+                value={amountStr}
                 disabled={!!activeTrade}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value || "0", 10);
-                  if (isNaN(v)) return;
-                  setAmount(v);
-                }}
-                onBlur={(e) => {
-                  let v = parseInt(e.target.value || "0", 10);
-                  if (isNaN(v) || v < 1000) v = 1000;
-                  if (v > 100000) v = 100000;
-                  setAmount(v);
-                }}
-                placeholder="Enter amount (1000 - 100000)"
+                onChange={(e) => setAmountStr(e.target.value)}
+                placeholder="Enter amount"
                 data-testid="amount-manual"
+                inputMode="decimal"
                 className="input"
                 style={{ paddingLeft: 26, width: "100%" }}
               />
             </div>
             <span className="text-dim" style={{ fontSize: 11, flexShrink: 0 }}>
-              Min $1,000 · Max $100,000
+              Type any amount you want
             </span>
           </div>
 
@@ -418,7 +412,7 @@ export default function BinaryTrade() {
           </div>
 
           {err && <div style={{ color: "var(--color-red)", marginBottom: 12, fontSize: 13 }} data-testid="bt-err">{err}</div>}
-          {usdtBalance < amount && (
+          {amount > 0 && usdtBalance < amount && (
             <div style={{ color: "var(--color-red)", marginBottom: 12, fontSize: 13 }}>
               Insufficient balance.{" "}
               <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => navigate("/deposit")}>Deposit now</button>
@@ -429,7 +423,7 @@ export default function BinaryTrade() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <button
               onClick={() => placeTrade("rise")}
-              disabled={busy || !!activeTrade || usdtBalance < amount}
+              disabled={busy || !!activeTrade || amount <= 0 || usdtBalance < amount}
               data-testid="buy-up-btn"
               className="bt-buybtn bt-buyup"
               style={{
@@ -441,7 +435,7 @@ export default function BinaryTrade() {
                 fontWeight: 800,
                 letterSpacing: 0.5,
                 cursor: busy || activeTrade ? "not-allowed" : "pointer",
-                opacity: busy || activeTrade || usdtBalance < amount ? 0.5 : 1,
+                opacity: busy || activeTrade || amount <= 0 || usdtBalance < amount ? 0.5 : 1,
                 transition: "all 0.18s ease",
                 textShadow: "0 1px 2px rgba(0,0,0,0.2)",
               }}
@@ -450,7 +444,7 @@ export default function BinaryTrade() {
             </button>
             <button
               onClick={() => placeTrade("fall")}
-              disabled={busy || !!activeTrade || usdtBalance < amount}
+              disabled={busy || !!activeTrade || amount <= 0 || usdtBalance < amount}
               data-testid="buy-down-btn"
               className="bt-buybtn bt-buydown"
               style={{
@@ -462,7 +456,7 @@ export default function BinaryTrade() {
                 fontWeight: 800,
                 letterSpacing: 0.5,
                 cursor: busy || activeTrade ? "not-allowed" : "pointer",
-                opacity: busy || activeTrade || usdtBalance < amount ? 0.5 : 1,
+                opacity: busy || activeTrade || amount <= 0 || usdtBalance < amount ? 0.5 : 1,
                 transition: "all 0.18s ease",
                 textShadow: "0 1px 2px rgba(0,0,0,0.2)",
               }}
