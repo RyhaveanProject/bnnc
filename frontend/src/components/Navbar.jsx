@@ -53,7 +53,7 @@ export default function Navbar() {
           </>
         ) : (
           <>
-            <span className="text-dim hide-mobile" data-testid="user-email" style={{fontSize:13}}>{user.email}</span>
+            <span className="text-dim hide-mobile user-email-display" data-testid="user-email">{user.email}</span>
             <button className="btn btn-ghost btn-sm hide-mobile" data-testid="logout-btn" onClick={async () => { await logout(); nav("/"); }}>{t("nav.logout")}</button>
           </>
         )}
