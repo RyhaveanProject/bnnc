@@ -2,15 +2,14 @@ import React, { useEffect, useState } from "react";
 import api from "../lib/api";
 import { useAuth } from "../lib/auth";
 
-// Helper function to format large numbers
+// Helper function to format balance with thousand separator and 2 decimals.
+// Always renders the FULL amount so users can see exactly how much they have.
 function formatBalance(num) {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + "M";
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + "K";
-  }
-  return num.toFixed(2);
+  const n = Number(num) || 0;
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export default function TotalBalance() {
