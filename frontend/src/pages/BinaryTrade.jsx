@@ -298,7 +298,7 @@ export default function BinaryTrade() {
 
           {/* Amount */}
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Amount (USDT)</div>
-          <div className="bt-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
+          <div className="bt-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 10 }}>
             {AMOUNTS.map((a) => {
               const active = amount === a;
               const disabled = usdtBalance < a;
@@ -326,6 +326,42 @@ export default function BinaryTrade() {
                 </button>
               );
             })}
+          </div>
+
+          {/* Manual amount input — min $1,000, max $100,000 */}
+          <div className="bt-manual-row" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, flexShrink: 0 }}>
+              Manual
+            </span>
+            <div style={{ position: "relative", flex: 1, minWidth: 140 }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", fontWeight: 700, pointerEvents: "none" }}>$</span>
+              <input
+                type="number"
+                min={1000}
+                max={100000}
+                step={100}
+                value={amount}
+                disabled={!!activeTrade}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value || "0", 10);
+                  if (isNaN(v)) return;
+                  setAmount(v);
+                }}
+                onBlur={(e) => {
+                  let v = parseInt(e.target.value || "0", 10);
+                  if (isNaN(v) || v < 1000) v = 1000;
+                  if (v > 100000) v = 100000;
+                  setAmount(v);
+                }}
+                placeholder="Enter amount (1000 - 100000)"
+                data-testid="amount-manual"
+                className="input"
+                style={{ paddingLeft: 26, width: "100%" }}
+              />
+            </div>
+            <span className="text-dim" style={{ fontSize: 11, flexShrink: 0 }}>
+              Min $1,000 · Max $100,000
+            </span>
           </div>
 
           {/* Duration */}
@@ -410,7 +446,7 @@ export default function BinaryTrade() {
                 textShadow: "0 1px 2px rgba(0,0,0,0.2)",
               }}
             >
-              ▲ Yüksək Al (Buy Up)
+              ▲ Buy Up
             </button>
             <button
               onClick={() => placeTrade("fall")}
@@ -431,7 +467,7 @@ export default function BinaryTrade() {
                 textShadow: "0 1px 2px rgba(0,0,0,0.2)",
               }}
             >
-              ▼ Düşüş Al (Buy Down)
+              ▼ Buy Down
             </button>
           </div>
         </div>
