@@ -19,6 +19,7 @@ import bcrypt
 import jwt
 import httpx
 import resend
+import yfinance as yf
 from bson import ObjectId
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File, Form
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -39,15 +40,33 @@ gridfs_bucket = AsyncIOMotorGridFSBucket(db, bucket_name="deposit_receipts")
 # --- Constants ---
 JWT_ALGORITHM = "HS256"
 SUPPORTED_CRYPTOS = ["USDT", "BTC", "ETH", "TRX", "BNB"]
-TRADING_PAIRS = ["BTC", "ETH", "BNB", "XRP", "SOL", "TRX", "USDT"]
+TRADING_PAIRS = ["NASDAQ", "ABD_INDEX", "PETROL", "ALTIN", "SP500", "US30", "XAUUSD", "BTCUSD"]
 COIN_NAMES = {
-    "BTC": "Bitcoin", "ETH": "Ethereum", "BNB": "BNB",
-    "XRP": "XRP", "SOL": "Solana", "TRX": "TRON", "USDT": "Tether",
+    "NASDAQ": "NASDAQ Composite",
+    "ABD_INDEX": "US Index",
+    "PETROL": "Crude Oil",
+    "ALTIN": "Gold",
+    "SP500": "S&P 500",
+    "US30": "Dow Jones Industrial",
+    "XAUUSD": "Gold (XAU/USD)",
+    "BTCUSD": "Bitcoin (BTC/USD)",
+}
+# Yahoo Finance ticker mapping
+YFINANCE_SYMBOLS = {
+    "NASDAQ": "^IXIC",
+    "ABD_INDEX": "^GSPC",
+    "PETROL": "CL=F",
+    "ALTIN": "GC=F",
+    "SP500": "^GSPC",
+    "US30": "^DJI",
+    "XAUUSD": "GC=F",
+    "BTCUSD": "BTC-USD",
 }
 # Static fallback prices (used only when ALL external APIs fail and no cache exists)
 STATIC_FALLBACK = {
-    "BTC": 95000.0, "ETH": 3400.0, "BNB": 690.0, "XRP": 2.20,
-    "SOL": 195.0, "TRX": 0.24, "USDT": 1.0,
+    "NASDAQ": 19500.0, "ABD_INDEX": 5900.0, "PETROL": 72.0,
+    "ALTIN": 2650.0, "SP500": 5900.0, "US30": 43000.0,
+    "XAUUSD": 2650.0, "BTCUSD": 95000.0,
 }
 KUCOIN_BASE = "https://api.kucoin.com"
 
@@ -713,39 +732,76 @@ async def _kucoin_sparkline(cli: httpx.AsyncClient, symbol: str) -> List[float]:
 
 
 async def _build_market_data() -> List[dict]:
-    async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "ADX-DUBAI/1.0"}) as cli:
-        tickers = await _kucoin_all_tickers(cli)
-        coins_for_candles = [c for c in TRADING_PAIRS if c != "USDT"]
-        spark_results = await asyncio.gather(
-            *[_kucoin_sparkline(cli, f"{c}-USDT") for c in coins_for_candles],
-            return_exceptions=True,
-        )
-        spark_map = {}
-        for coin, res in zip(coins_for_candles, spark_results):
-            spark_map[coin] = res if isinstance(res, list) else []
-
+    """Fetch market data using yfinance (Yahoo Finance API)"""
+    loop = asyncio.get_event_loop()
     out = []
+    
     for coin in TRADING_PAIRS:
-        if coin == "USDT":
+        yf_symbol = YFINANCE_SYMBOLS.get(coin, coin)
+        try:
+            # Fetch ticker data in thread executor (yfinance is sync)
+            ticker = await loop.run_in_executor(None, yf.Ticker, yf_symbol)
+            
+            # Get fast_info for quick price data
+            def get_info():
+                try:
+                    return ticker.fast_info
+                except:
+                    return {}
+            
+            info = await loop.run_in_executor(None, get_info)
+            
+            # Get price
+            price = info.get("lastPrice", 0) or info.get("regularMarketPrice", 0)
+            if not price:
+                price = STATIC_FALLBACK.get(coin, 0.0)
+            
+            # Get historical data for sparkline and change%
+            def get_history():
+                try:
+                    return ticker.history(period="1d", interval="15m")
+                except:
+                    return None
+            
+            hist = await loop.run_in_executor(None, get_history)
+            
+            sparkline = []
+            change24h = 0.0
+            
+            if hist is not None and not hist.empty and 'Close' in hist.columns:
+                sparkline = hist['Close'].tail(30).tolist()
+                if len(sparkline) >= 2:
+                    change24h = ((sparkline[-1] - sparkline[0]) / sparkline[0]) * 100
+            
+            # Fallback sparkline
+            if not sparkline:
+                sparkline = [float(price)] * 4
+            
             out.append({
-                "symbol": "USDT", "name": COIN_NAMES["USDT"], "price": 1.0,
-                "change24h": 0.0, "marketCap": 0, "volume24h": 0,
-                "sparkline": [1.0, 1.0, 1.0, 1.0], "image": None,
+                "symbol": coin,
+                "name": COIN_NAMES.get(coin, coin),
+                "price": float(price) if price else 0.0,
+                "change24h": float(change24h),
+                "marketCap": 0,
+                "volume24h": 0,
+                "sparkline": sparkline,
+                "image": None,
             })
-            continue
-        sym = f"{coin}-USDT"
-        t = tickers.get(sym, {})
-        try: price = float(t.get("last") or 0)
-        except (TypeError, ValueError): price = 0.0
-        try: change_rate = float(t.get("changeRate") or 0) * 100
-        except (TypeError, ValueError): change_rate = 0.0
-        try: volume = float(t.get("volValue") or 0)
-        except (TypeError, ValueError): volume = 0.0
-        out.append({
-            "symbol": coin, "name": COIN_NAMES.get(coin, coin), "price": price,
-            "change24h": change_rate, "marketCap": 0, "volume24h": volume,
-            "sparkline": spark_map.get(coin, []), "image": None,
-        })
+        except Exception as e:
+            logger.warning(f"yfinance fetch failed for {coin}: {e}")
+            # Fallback data
+            fallback_price = STATIC_FALLBACK.get(coin, 0.0)
+            out.append({
+                "symbol": coin,
+                "name": COIN_NAMES.get(coin, coin),
+                "price": fallback_price,
+                "change24h": 0.0,
+                "marketCap": 0,
+                "volume24h": 0,
+                "sparkline": [fallback_price] * 4,
+                "image": None,
+            })
+    
     return out
 
 
@@ -1510,7 +1566,7 @@ async def root():
 
 
 # ============ BINARY TRADING ============
-BINARY_TRADE_PROFIT_RATES = {300: 0.05, 600: 0.07, 900: 0.09, 1200: 0.12}
+BINARY_TRADE_PROFIT_RATES = {60: 0.02, 120: 0.04, 180: 0.06, 240: 0.08}
 # No fixed allowed amount list — users may enter any positive USDT amount up to
 # their balance. Keep a soft upper bound to avoid absurd values.
 BINARY_TRADE_MIN_AMOUNT = 1.0
