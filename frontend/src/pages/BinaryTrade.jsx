@@ -4,12 +4,12 @@ import api, { TRADING_PAIRS, fmtMoney } from "../lib/api";
 import { useMarket, Sparkline } from "../components/Market";
 import { useAuth } from "../lib/auth";
 
-const AMOUNTS = [1000, 5000, 10000, 50000];
+const AMOUNTS = [100, 1000, 5000, 50000];
 const DURATIONS = [
-  { seconds: 300, label: "5 min", profit: 5 },
-  { seconds: 600, label: "10 min", profit: 7 },
-  { seconds: 900, label: "15 min", profit: 9 },
-  { seconds: 1200, label: "20 min", profit: 12 },
+  { seconds: 60, label: "1 min", profit: 2 },
+  { seconds: 120, label: "2 min", profit: 4 },
+  { seconds: 180, label: "3 min", profit: 6 },
+  { seconds: 240, label: "4 min", profit: 8 },
 ];
 const PAIRS = TRADING_PAIRS.filter((s) => s !== "USDT");
 
