@@ -34,13 +34,21 @@ api.interceptors.response.use(
 export default api;
 
 export const SUPPORTED_CRYPTOS = ["USDT", "BTC", "ETH", "TRX", "BNB"];
-export const TRADING_PAIRS = ["BTC", "ETH", "BNB", "XRP", "SOL", "TRX", "USDT"];
+export const TRADING_PAIRS = ["NASDAQ", "ABD_INDEX", "PETROL", "ALTIN", "SP500", "US30", "XAUUSD", "BTCUSD"];
 export const COIN_NAMES = {
   USDT: "Tether",
   BTC: "Bitcoin",
   ETH: "Ethereum",
   TRX: "TRON",
   BNB: "BNB",
+  NASDAQ: "NASDAQ Composite",
+  ABD_INDEX: "S&P 500 Index",
+  PETROL: "Crude Oil",
+  ALTIN: "Gold",
+  SP500: "S&P 500",
+  US30: "Dow Jones",
+  XAUUSD: "Gold (XAU/USD)",
+  BTCUSD: "Bitcoin",
 };
 
 export function fmtMoney(n, d = 2) {
