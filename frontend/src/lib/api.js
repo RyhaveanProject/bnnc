@@ -42,13 +42,13 @@ export const COIN_NAMES = {
   TRX: "TRON",
   BNB: "BNB",
   NASDAQ: "NASDAQ Composite",
-  ABD_INDEX: "S&P 500 Index",
+  ABD_INDEX: "US Index",
   PETROL: "Crude Oil",
   ALTIN: "Gold",
   SP500: "S&P 500",
-  US30: "Dow Jones",
+  US30: "Dow Jones Industrial",
   XAUUSD: "Gold (XAU/USD)",
-  BTCUSD: "Bitcoin",
+  BTCUSD: "Bitcoin (BTC/USD)",
 };
 
 export function fmtMoney(n, d = 2) {
