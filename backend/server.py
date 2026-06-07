@@ -22,7 +22,7 @@ import resend
 import yfinance as yf
 from bson import ObjectId
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File, Form
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
@@ -252,7 +252,7 @@ def empty_balances() -> dict:
 
 
 def set_auth_cookie(resp: Response, token: str):
-    # SameSite=None + Secure is required for cross-domain cookie (Cloudflare front → Render back)
+    # SameSite=None + Secure is required for cross-domain cookie (Cloudflare front â Render back)
     # We still return the token in JSON for localStorage usage (Bearer header), this cookie is best-effort.
     resp.set_cookie(
         key="access_token",
@@ -374,7 +374,7 @@ def _otp_email_html(username: str, code: str) -> str:
         </p>
       </td></tr>
       <tr><td style="background:#0b0e11;padding:16px 28px;text-align:center;border-top:1px solid #2b3139;">
-        <span style="color:#5e6673;font-size:11px;">© ADX DUBAI &middot; adx-dubai.com</span>
+        <span style="color:#5e6673;font-size:11px;">Â© ADX DUBAI &middot; adx-dubai.com</span>
       </td></tr>
     </table>
   </td></tr>
@@ -397,7 +397,7 @@ async def _send_verification_email(to_email: str, username: str, code: str) -> N
     payload = {
         "from": _resend_from(),
         "to": [to_email],
-        "subject": f"ADX DUBAI — Verification code: {code}",
+        "subject": f"ADX DUBAI â Verification code: {code}",
         "html": _otp_email_html(username, code),
     }
     try:
@@ -482,7 +482,7 @@ async def register_start(data: RegisterIn):
     # Fire-and-forget the email so the API responds immediately and the
     # frontend can show the 6-digit code input form. On slow infra (cold start
     # + Resend roundtrip) the previous blocking await could exceed the
-    # frontend axios timeout of 30s, leaving the UI stuck on "Loading…".
+    # frontend axios timeout of 30s, leaving the UI stuck on "Loadingâ¦".
     asyncio.create_task(_send_verification_email_bg(email, data.username, code))
     return {"ok": True, "email": email, "ttl_minutes": OTP_TTL_MIN, "resend_cooldown_sec": OTP_RESEND_COOLDOWN_SEC}
 
@@ -512,7 +512,7 @@ async def register_resend(data: RegisterResendIn):
             "expires_at": now + timedelta(minutes=OTP_TTL_MIN),
         }},
     )
-    # Fire-and-forget so the UI doesn't get stuck on "Loading…" while the
+    # Fire-and-forget so the UI doesn't get stuck on "Loadingâ¦" while the
     # email is being delivered through Resend.
     asyncio.create_task(_send_verification_email_bg(email, pending.get("username", ""), code))
     return {"ok": True, "ttl_minutes": OTP_TTL_MIN, "resend_cooldown_sec": OTP_RESEND_COOLDOWN_SEC}
@@ -973,20 +973,20 @@ async def notify_deposit(deposit: dict, user: dict, receipt_bytes: Optional[byte
     # credited if confirmed. Final crediting also re-evaluates the price.
     usd_value = await _deposit_usd_value(deposit["currency"], float(deposit["amount"]))
     caption = (
-        f"💰 *New Deposit Request*\n"
-        f"👤 User: `{user['username']}`\n"
-        f"📧 Email: `{user['email']}`\n"
-        f"💎 Token: *{deposit['currency']}*\n"
-        f"💵 Amount: *{deposit['amount']} {deposit['currency']}*\n"
-        f"💲 USD value: *≈ ${usd_value:,.2f}*\n"
-        f"🏦 Wallet: `{deposit.get('wallet_address','-')}`\n"
-        f"🌐 Network: {deposit.get('network','-')}\n"
-        f"📅 Date: {deposit['created_at']}\n"
-        f"🆔 Deposit: `{deposit['id']}`"
+        f"ð° *New Deposit Request*\n"
+        f"ð¤ User: `{user['username']}`\n"
+        f"ð§ Email: `{user['email']}`\n"
+        f"ð Token: *{deposit['currency']}*\n"
+        f"ðµ Amount: *{deposit['amount']} {deposit['currency']}*\n"
+        f"ð² USD value: *â ${usd_value:,.2f}*\n"
+        f"ð¦ Wallet: `{deposit.get('wallet_address','-')}`\n"
+        f"ð Network: {deposit.get('network','-')}\n"
+        f"ð Date: {deposit['created_at']}\n"
+        f"ð Deposit: `{deposit['id']}`"
     )
     kb = {"inline_keyboard": [[
-        {"text": "✅ Confirm", "callback_data": f"adep:{deposit['id']}"},
-        {"text": "❌ Cancel", "callback_data": f"rdep:{deposit['id']}"},
+        {"text": "â Confirm", "callback_data": f"adep:{deposit['id']}"},
+        {"text": "â Cancel", "callback_data": f"rdep:{deposit['id']}"},
     ]]}
     if receipt_bytes:
         ext = "jpg" if "jpeg" in receipt_mime or "jpg" in receipt_mime else (
@@ -1004,21 +1004,21 @@ async def notify_withdraw(w: dict, user: dict):
     if not chat_id:
         return
     text = (
-        f"🏧 *Withdraw Request*\n"
-        f"👤 User: `{user['username']}`\n"
-        f"📧 Email: `{user['email']}`\n"
-        f"💎 Token: *{w['currency']}*\n"
-        f"💵 Amount: *{w['amount']} {w['currency']}*\n"
-        f"💸 Fee: {w.get('fee',0)} {w['currency']}\n"
-        f"💰 Net: {w.get('net',0)} {w['currency']}\n"
-        f"🏦 Address: `{w['address']}`\n"
-        f"🌐 Network: {w.get('network','-')}\n"
-        f"📅 Date: {w['created_at']}\n"
-        f"🆔 Withdraw: `{w['id']}`"
+        f"ð§ *Withdraw Request*\n"
+        f"ð¤ User: `{user['username']}`\n"
+        f"ð§ Email: `{user['email']}`\n"
+        f"ð Token: *{w['currency']}*\n"
+        f"ðµ Amount: *{w['amount']} {w['currency']}*\n"
+        f"ð¸ Fee: {w.get('fee',0)} {w['currency']}\n"
+        f"ð° Net: {w.get('net',0)} {w['currency']}\n"
+        f"ð¦ Address: `{w['address']}`\n"
+        f"ð Network: {w.get('network','-')}\n"
+        f"ð Date: {w['created_at']}\n"
+        f"ð Withdraw: `{w['id']}`"
     )
     kb = {"inline_keyboard": [[
-        {"text": "✅ Mark Paid", "callback_data": f"awd:{w['id']}"},
-        {"text": "❌ Reject", "callback_data": f"rwd:{w['id']}"},
+        {"text": "â Mark Paid", "callback_data": f"awd:{w['id']}"},
+        {"text": "â Reject", "callback_data": f"rwd:{w['id']}"},
     ]]}
     await tg_send("sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "Markdown", "reply_markup": kb})
 
@@ -1102,11 +1102,11 @@ async def _handle_callback(cb_id: str, data: str, msg_chat_id: str, msg_id):
             {"id": dep["user_id"]},
             {"$inc": {"balances.USDT": float(usd_value)}},
         )
-        await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": f"Confirmed: +${usd_value:,.2f} USDT ✅"})
+        await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": f"Confirmed: +${usd_value:,.2f} USDT â"})
         if msg_id:
             await tg_send("editMessageReplyMarkup", {
                 "chat_id": msg_chat_id, "message_id": msg_id,
-                "reply_markup": {"inline_keyboard": [[{"text": f"✅ CONFIRMED  +${usd_value:,.2f}", "callback_data": "noop"}]]},
+                "reply_markup": {"inline_keyboard": [[{"text": f"â CONFIRMED  +${usd_value:,.2f}", "callback_data": "noop"}]]},
             })
     elif op == "rdep":
         flip = await db.deposits.update_one(
@@ -1116,11 +1116,11 @@ async def _handle_callback(cb_id: str, data: str, msg_chat_id: str, msg_id):
         if flip.modified_count == 0:
             await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Already processed"})
             return
-        await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Deposit cancelled ❌"})
+        await tg_send("answerCallbackQuery", {"callback_query_id": cb_id, "text": "Deposit cancelled â"})
         if msg_id:
             await tg_send("editMessageReplyMarkup", {
                 "chat_id": msg_chat_id, "message_id": msg_id,
-                "reply_markup": {"inline_keyboard": [[{"text": "❌ CANCELLED", "callback_data": "noop"}]]},
+                "reply_markup": {"inline_keyboard": [[{"text": "â CANCELLED", "callback_data": "noop"}]]},
             })
     elif op == "awd":
         w = await db.withdrawals.find_one({"id": target_id}, {"_id": 0})
@@ -1132,7 +1132,7 @@ async def _handle_callback(cb_id: str, data: str, msg_chat_id: str, msg_id):
         if msg_id:
             await tg_send("editMessageReplyMarkup", {
                 "chat_id": msg_chat_id, "message_id": msg_id,
-                "reply_markup": {"inline_keyboard": [[{"text": "✅ PAID", "callback_data": "noop"}]]},
+                "reply_markup": {"inline_keyboard": [[{"text": "â PAID", "callback_data": "noop"}]]},
             })
     elif op == "rwd":
         w = await db.withdrawals.find_one({"id": target_id}, {"_id": 0})
@@ -1143,10 +1143,10 @@ async def _handle_callback(cb_id: str, data: str, msg_chat_id: str, msg_id):
         if msg_id:
             await tg_send("editMessageReplyMarkup", {
                 "chat_id": msg_chat_id, "message_id": msg_id,
-                "reply_markup": {"inline_keyboard": [[{"text": "❌ REJECTED", "callback_data": "noop"}]]},
+                "reply_markup": {"inline_keyboard": [[{"text": "â REJECTED", "callback_data": "noop"}]]},
             })
     else:
-        # Unknown callback data — still answer so the loader disappears.
+        # Unknown callback data â still answer so the loader disappears.
         await tg_send("answerCallbackQuery", {"callback_query_id": cb_id})
 
 
@@ -1557,17 +1557,80 @@ async def admin_withdrawals(admin: dict = Depends(require_admin)):
     return rows
 
 
+@api.get("/admin/online-trading")
+async def admin_online_trading(admin: dict = Depends(require_admin)):
+    """Get list of users currently in active binary trades."""
+    active_trades = await db.binary_trades.find({"status": "active"}, {"_id": 0}).to_list(500)
+    result = []
+    for trade in active_trades:
+        user = await db.users.find_one({"id": trade["user_id"]}, {"_id": 0, "password_hash": 0})
+        if user:
+            result.append({
+                "trade_id": trade["id"],
+                "user_id": user["id"],
+                "username": user["username"],
+                "email": user["email"],
+                "symbol": trade["symbol"],
+                "direction": trade["direction"],
+                "amount_usd": trade["amount_usd"],
+                "entry_price": trade["entry_price"],
+                "expires_at": trade["expires_at"],
+                "force_win": trade.get("force_win", False),
+                "force_lose": trade.get("force_lose", False),
+            })
+    return result
+
+
+@api.post("/admin/users/{user_id}/force-win")
+async def admin_force_win(user_id: str, admin: dict = Depends(require_admin)):
+    """Admin opens profit - user will win 100% when trade expires."""
+    # Find active trades for this user
+    result = await db.binary_trades.update_many(
+        {"user_id": user_id, "status": "active"},
+        {"$set": {"force_win": True, "force_lose": False}},
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="No active trades found for this user")
+    return {"ok": True, "modified": result.modified_count, "message": "Profit opened - user will win when trade expires"}
+
+
+@api.post("/admin/users/{user_id}/force-lose")
+async def admin_force_lose(user_id: str, admin: dict = Depends(require_admin)):
+    """Admin closes profit - user will lose 100% when trade expires."""
+    # Find active trades for this user
+    result = await db.binary_trades.update_many(
+        {"user_id": user_id, "status": "active"},
+        {"$set": {"force_win": False, "force_lose": True}},
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="No active trades found for this user")
+    return {"ok": True, "modified": result.modified_count, "message": "Profit closed - user will lose when trade expires"}
+
+
 # ---
 @api.get("/")
 async def root():
     return {"name": "ADX DUBAI API", "status": "ok"}
 
 
+@api.get("/download/backend_fix.zip")
+async def download_backend_fix():
+    """Download the fixed backend server.py file."""
+    file_path = ROOT_DIR / "static" / "backend_fix.zip"
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(
+        path=str(file_path),
+        filename="backend_fix.zip",
+        media_type="application/zip",
+    )
+
+
 
 
 # ============ BINARY TRADING ============
 BINARY_TRADE_PROFIT_RATES = {60: 0.02, 120: 0.04, 180: 0.06, 240: 0.08}
-# No fixed allowed amount list — users may enter any positive USDT amount up to
+# No fixed allowed amount list â users may enter any positive USDT amount up to
 # their balance. Keep a soft upper bound to avoid absurd values.
 BINARY_TRADE_MIN_AMOUNT = 1.0
 BINARY_TRADE_MAX_AMOUNT = 1_000_000.0
@@ -1631,6 +1694,8 @@ async def binary_trade_place(data: BinaryTradePlaceIn, user: dict = Depends(get_
         "profit": None,
         "payout": None,
         "result": None,
+        "force_win": False,
+        "force_lose": False,
     }
     await db.binary_trades.insert_one(trade)
     trade_view = {k: v for k, v in trade.items() if k != "_id"}
@@ -1643,7 +1708,7 @@ async def binary_trade_complete(trade_id: str, user: dict = Depends(get_current_
     if not trade:
         raise HTTPException(status_code=404, detail="Trade not found")
     if trade["status"] != "active":
-        # Already settled by sweeper or a previous call — return it as-is so
+        # Already settled by sweeper or a previous call â return it as-is so
         # the frontend can finalize the UI cleanly.
         updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
         return {
@@ -1674,28 +1739,46 @@ async def binary_trade_complete(trade_id: str, user: dict = Depends(get_current_
 
 
 async def _settle_binary_trade(trade: dict) -> dict:
-    """Finalize a single active binary trade according to its owner's
-    trading_enabled flag. Idempotent: if the trade is already completed it
-    just returns it unchanged. This is the single source of truth used by
-    both the on-demand `/complete/{id}` endpoint and the background sweeper
-    so a user can close the tab and still get auto-credited when the timer
-    runs out."""
+    """Finalize a single active binary trade according to admin control flags.
+    
+    Logic:
+    - If force_win=True â User wins 100% (admin opened profit)
+    - If force_lose=True â User loses 100% (admin closed profit)
+    - If neither flag is set â User loses 100% by default (admin didn't open)
+    
+    Idempotent: if the trade is already completed it just returns it unchanged.
+    This is the single source of truth used by both the on-demand `/complete/{id}` 
+    endpoint and the background sweeper so a user can close the tab and still get 
+    auto-credited when the timer runs out."""
     if trade.get("status") != "active":
         return trade
     db_user = await db.users.find_one({"id": trade["user_id"]}, {"_id": 0, "password_hash": 0})
     if not db_user:
         return trade
-    trading_enabled = bool(db_user.get("trading_enabled", False))
+    
     amount = float(trade["amount_usd"])
     profit_rate = float(trade["profit_rate"])
-    if trading_enabled:
+    
+    # Admin control logic
+    force_win = bool(trade.get("force_win", False))
+    force_lose = bool(trade.get("force_lose", False))
+    
+    if force_win:
+        # Admin aÃ§dÄ± qazancÄ± - istifadÉÃ§i qazanÄ±r
         payout = round(amount * (1.0 + profit_rate), 8)
         profit = round(amount * profit_rate, 8)
         result = "win"
-    else:
+    elif force_lose:
+        # Admin baÄladÄ± qazancÄ± - istifadÉÃ§i uduzur
         payout = 0.0
         profit = -amount
         result = "loss"
+    else:
+        # Admin heÃ§ nÉ etmÉyib - default: istifadÉÃ§i uduzur
+        payout = 0.0
+        profit = -amount
+        result = "loss"
+    
     # Atomic flip to prevent double-credit if two workers race.
     flip = await db.binary_trades.update_one(
         {"id": trade["id"], "status": "active"},
@@ -1705,7 +1788,8 @@ async def _settle_binary_trade(trade: dict) -> dict:
             "profit": profit,
             "payout": payout,
             "result": result,
-            "trading_enabled_at_completion": trading_enabled,
+            "force_win": force_win,
+            "force_lose": force_lose,
         }},
     )
     if flip.modified_count and payout > 0:
