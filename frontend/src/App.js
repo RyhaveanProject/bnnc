@@ -38,12 +38,25 @@ function ProtectedRoute({ children, adminOnly = false }) {
   return children;
 }
 
+function RootRoute() {
+  const { user, loading } = useAuth();
+  if (loading || user === undefined) {
+    return (
+      <div style={{ padding: 60, textAlign: "center" }} className="text-dim" data-testid="auth-loading">
+        Loading…
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  return <Landing />;
+}
+
 function Shell() {
   return (
     <div className="App">
       <Navbar />
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/markets" element={<Markets />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
