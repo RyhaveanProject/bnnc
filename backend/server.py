@@ -1629,17 +1629,35 @@ async def download_backend_fix():
 
 
 # ============ BINARY TRADING ============
-BINARY_TRADE_PROFIT_RATES = {60: 0.02, 120: 0.04, 180: 0.06, 240: 0.08}
+BINARY_TRADE_PROFIT_RATES = {120: 0.03, 240: 0.05, 360: 0.07, 480: 0.09}
 # No fixed allowed amount list â users may enter any positive USDT amount up to
 # their balance. Keep a soft upper bound to avoid absurd values.
 BINARY_TRADE_MIN_AMOUNT = 1.0
 BINARY_TRADE_MAX_AMOUNT = 1_000_000.0
 
 
+def _max_allowed_profit_rate(balance: float) -> float:
+    """Profit tiers unlock based on the user's current USDT balance.
+
+    balance < 1000   -> 0.03 only
+    balance < 5000   -> up to 0.05
+    balance < 8000   -> up to 0.07
+    balance >= 8000  -> up to 0.09
+    """
+    if balance < 1000:
+        return 0.03
+    if balance < 5000:
+        return 0.05
+    if balance < 8000:
+        return 0.07
+    return 0.09
+
+
+
 class BinaryTradePlaceIn(BaseModel):
     symbol: str
     amount_usd: float = Field(gt=0)
-    duration: int  # 300 / 600 / 900 / 1200 seconds
+    duration: int  # 120 / 240 / 360 / 480 seconds
     direction: Literal["rise", "fall"]
 
 
@@ -1654,7 +1672,7 @@ async def binary_trade_place(data: BinaryTradePlaceIn, user: dict = Depends(get_
             detail=f"Amount must be between {BINARY_TRADE_MIN_AMOUNT} and {BINARY_TRADE_MAX_AMOUNT} USDT",
         )
     if data.duration not in BINARY_TRADE_PROFIT_RATES:
-        raise HTTPException(status_code=400, detail="Duration must be 300, 600, 900 or 1200 seconds")
+        raise HTTPException(status_code=400, detail="Duration must be 120, 240, 360 or 480 seconds")
 
     bal = user.get("balances", {})
     usdt_bal = float(bal.get("USDT", 0))
@@ -1662,6 +1680,11 @@ async def binary_trade_place(data: BinaryTradePlaceIn, user: dict = Depends(get_
         raise HTTPException(status_code=400, detail="Insufficient USDT balance")
 
     profit_rate = BINARY_TRADE_PROFIT_RATES[data.duration]
+
+    # Balance-based profit tier lock
+    if profit_rate > _max_allowed_profit_rate(usdt_bal):
+        raise HTTPException(status_code=400, detail="This profit rate is locked for your current balance")
+
     now_dt = datetime.now(timezone.utc)
     expires_at = now_dt + timedelta(seconds=data.duration)
 
@@ -1924,7 +1947,7 @@ async def admin_force_win(user_id: str, admin: dict = Depends(require_admin)):
     count = 0
     for trade in active_trades:
         amount = float(trade["amount_usd"])
-        profit_rate = float(trade.get("profit_rate", 0.02))
+        profit_rate = float(trade.get("profit_rate", 0.03))
         profit = amount * profit_rate
         payout = amount + profit
         
