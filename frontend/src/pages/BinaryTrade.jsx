@@ -6,11 +6,24 @@ import { useAuth } from "../lib/auth";
 
 const AMOUNTS = [100, 1000, 5000, 50000];
 const DURATIONS = [
-  { seconds: 60, label: "1 min", profit: 2 },
-  { seconds: 120, label: "2 min", profit: 4 },
-  { seconds: 180, label: "3 min", profit: 6 },
-  { seconds: 240, label: "4 min", profit: 8 },
+  { seconds: 120, label: "2 min", profit: 3 },
+  { seconds: 240, label: "4 min", profit: 5 },
+  { seconds: 360, label: "6 min", profit: 7 },
+  { seconds: 480, label: "8 min", profit: 9 },
 ];
+
+// Profit tiers unlock based on the user's current USDT balance.
+// Balance < 1000  -> only 3% allowed
+// Balance < 5000  -> up to 5% (3%, 5%)
+// Balance < 8000  -> up to 7% (3%, 5%, 7%)
+// Balance < 10000 -> up to 9% (3%, 5%, 7%, 9%)
+// Balance >= 10000 -> all (same set, max 9%)
+function maxAllowedProfitPct(balance) {
+  if (balance < 1000) return 3;
+  if (balance < 5000) return 5;
+  if (balance < 8000) return 7;
+  return 9;
+}
 const PAIRS = TRADING_PAIRS.filter((s) => s !== "USDT");
 
 function fmt(n, d = 2) {
@@ -34,7 +47,7 @@ export default function BinaryTrade() {
   const [amountStr, setAmountStr] = useState("");
   const amount = Number(amountStr) || 0;
   const setAmount = (v) => setAmountStr(v === "" || v == null ? "" : String(v));
-  const [duration, setDuration] = useState(300);
+  const [duration, setDuration] = useState(120);
   const [activeTrade, setActiveTrade] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [lastResult, setLastResult] = useState(null);
@@ -47,7 +60,17 @@ export default function BinaryTrade() {
   const price = coin ? coin.price : 0;
   const change = coin ? coin.change24h : 0;
   const usdtBalance = user?.balances?.USDT || 0;
+  const maxAllowedPct = maxAllowedProfitPct(usdtBalance);
   const selectedDuration = DURATIONS.find((d) => d.seconds === duration);
+
+  // If the currently selected duration's profit tier becomes locked
+  // (e.g. balance dropped), fall back to the lowest tier (2 min / 3%).
+  useEffect(() => {
+    if (selectedDuration && selectedDuration.profit > maxAllowedPct) {
+      setDuration(120);
+    }
+  }, [maxAllowedPct, selectedDuration]);
+
   const profitPct = selectedDuration ? selectedDuration.profit : 0;
   const estimatedProfit = (amount * profitPct) / 100;
   const estimatedPayout = amount + estimatedProfit;
@@ -363,12 +386,14 @@ export default function BinaryTrade() {
           <div className="bt-duration-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 24 }}>
             {DURATIONS.map((d) => {
               const active = duration === d.seconds;
+              const locked = d.profit > maxAllowedPct;
               return (
                 <button
                   key={d.seconds}
-                  onClick={() => setDuration(d.seconds)}
-                  disabled={!!activeTrade}
+                  onClick={() => !locked && setDuration(d.seconds)}
+                  disabled={!!activeTrade || locked}
                   data-testid={`duration-${d.seconds}`}
+                  title={locked ? "Bu faiz dərəcəsi balansınız üçün kilidlidir" : ""}
                   style={{
                     padding: "14px 0",
                     borderRadius: 10,
@@ -376,12 +401,16 @@ export default function BinaryTrade() {
                     borderColor: active ? "var(--color-accent)" : "var(--border)",
                     background: active ? "var(--color-accent)" : "transparent",
                     color: active ? "#0b0e11" : "inherit",
-                    cursor: activeTrade ? "not-allowed" : "pointer",
+                    cursor: activeTrade || locked ? "not-allowed" : "pointer",
+                    opacity: locked ? 0.4 : 1,
                     transition: "all 0.15s",
+                    position: "relative",
                   }}
                 >
                   <div style={{ fontWeight: 700, fontSize: 15 }}>{d.label}</div>
-                  <div style={{ fontSize: 11, marginTop: 2, opacity: active ? 0.8 : 0.7 }}>+{d.profit}% profit</div>
+                  <div style={{ fontSize: 11, marginTop: 2, opacity: active ? 0.8 : 0.7 }}>
+                    +{d.profit}% profit{locked ? " 🔒" : ""}
+                  </div>
                 </button>
               );
             })}
