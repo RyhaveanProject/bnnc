@@ -322,6 +322,25 @@ async def startup():
     # user closed their browser. Guarantees the offline-aware auto-credit
     # behaviour requested in the spec.
     asyncio.create_task(_binary_trade_sweeper())
+    # Keep-alive: ping own /health every 10 minutes so Render free tier
+    # never goes to sleep. UptimeRobot also monitors the same endpoint
+    # for an extra layer of reliability.
+    asyncio.create_task(_keep_alive_ping())
+
+
+async def _keep_alive_ping():
+    """Ping own /health every 10 minutes to prevent Render free-tier sleep."""
+    await asyncio.sleep(60)  # wait 1 min after startup before first ping
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8001")
+    url = f"{base_url.rstrip('/')}/api/health"
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client_ping:
+                r = await client_ping.get(url)
+                logger.info("Keep-alive ping → %s %s", url, r.status_code)
+        except Exception as e:
+            logger.warning("Keep-alive ping failed: %s", e)
+        await asyncio.sleep(600)  # 10 minutes
 
 
 @app.on_event("shutdown")
