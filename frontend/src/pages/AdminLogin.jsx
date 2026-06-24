@@ -47,7 +47,7 @@ export default function AdminLogin() {
           <form onSubmit={submit} className="space-y-4">
             <div>
               <label className="label-eyebrow block mb-2">Email</label>
-              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="input-dark font-mono" placeholder="admin@procrypto.io" data-testid="admin-login-email" />
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="input-dark font-mono" placeholder="admin@platform.io" data-testid="admin-login-email" />
             </div>
             <div>
               <label className="label-eyebrow block mb-2">Password</label>
