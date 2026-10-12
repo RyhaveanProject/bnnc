@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../lib/auth";
 import "./LiveSupport.css";
@@ -6,19 +7,39 @@ import "./LiveSupport.css";
 /**
  * Floating "Online Support" widget (bottom-right, on every page).
  * Talks over WebSocket to the standalone live-support service whose URL is
- * provided by REACT_APP_LIVE_SUPPORT_URL. If the env is empty, nothing renders.
+ * provided by REACT_APP_LIVE_SUPPORT_URL or /live-support-config.json.
+ * The launcher stays visible even when the service is not configured.
  * Other components can open it with: window.dispatchEvent(new Event("open-live-support"))
  */
-const BASE = (process.env.REACT_APP_LIVE_SUPPORT_URL || "").replace(/\/+$/, "");
-const WS_URL = BASE.replace(/^http/i, "ws") + "/ws";
+function supportEndpoint(value) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  try {
+    const raw = value.trim();
+    const url = new URL(/^(https?|wss?):\/\//i.test(raw) ? raw : `https://${raw}`);
+    if (!["http:", "https:", "ws:", "wss:"].includes(url.protocol) || url.username || url.password) return "";
+    url.protocol = url.protocol === "https:" || url.protocol === "wss:" ? "wss:" : "ws:";
+    if (window.location.protocol === "https:" && url.protocol === "ws:") url.protocol = "wss:";
+    url.pathname = `${url.pathname.replace(/\/+$/, "").replace(/\/ws$/, "")}/ws`;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch { return ""; }
+}
+
+function readStored(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function store(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* Chat still works without browser storage. */ }
+}
 const SID_KEY = "adx_ls_sid";
 const PROFILE_KEY = "adx_ls_profile";
 
 const DICT = {
-  az: { title: "Online Dəstək", sub: "Adətən bir neçə dəqiqəyə cavab veririk", name: "Adınız", account: "Hesab məlumatı (e-poçt / istifadəçi adı / ID)", message: "Mesajınız", start: "Göndər", type: "Mesaj yazın…", waiting: "Müraciətiniz qəbul edildi. Operator gözlənilir…", active: "Operator", closed: "Söhbət bağlandı", newChat: "Yeni söhbət", connecting: "Qoşulur…", offline: "Bağlantı bərpa olunur…", typing: "operator yazır…", image: "Şəkil", seen: "Oxundu", required: "Bütün xanaları doldurun", tooBig: "Şəkil çox böyükdür" },
-  en: { title: "Online Support", sub: "We usually reply in a few minutes", name: "Your name", account: "Account info (email / username / ID)", message: "Your message", start: "Send", type: "Type a message…", waiting: "Request received. Waiting for an operator…", active: "Operator", closed: "Chat closed", newChat: "New chat", connecting: "Connecting…", offline: "Reconnecting…", typing: "operator is typing…", image: "Image", seen: "Seen", required: "Please fill in all fields", tooBig: "Image is too large" },
-  ru: { title: "Онлайн поддержка", sub: "Обычно отвечаем за несколько минут", name: "Ваше имя", account: "Данные аккаунта (email / логин / ID)", message: "Ваше сообщение", start: "Отправить", type: "Напишите сообщение…", waiting: "Запрос принят. Ожидание оператора…", active: "Оператор", closed: "Чат закрыт", newChat: "Новый чат", connecting: "Подключение…", offline: "Восстановление связи…", typing: "оператор печатает…", image: "Фото", seen: "Прочитано", required: "Заполните все поля", tooBig: "Изображение слишком большое" },
-  tr: { title: "Canlı Destek", sub: "Genellikle birkaç dakikada yanıt veririz", name: "Adınız", account: "Hesap bilgisi (e-posta / kullanıcı adı / ID)", message: "Mesajınız", start: "Gönder", type: "Mesaj yazın…", waiting: "Talebiniz alındı. Operatör bekleniyor…", active: "Operatör", closed: "Sohbet kapandı", newChat: "Yeni sohbet", connecting: "Bağlanıyor…", offline: "Yeniden bağlanıyor…", typing: "operatör yazıyor…", image: "Resim", seen: "Okundu", required: "Tüm alanları doldurun", tooBig: "Resim çok büyük" },
+  az: { title: "Canlı Dəstək", unavailable: "Canlı dəstək hazırda əlçatan deyil. Daha sonra yenidən yoxlayın.", sub: "Adətən bir neçə dəqiqəyə cavab veririk", name: "Adınız", account: "Hesab məlumatı (e-poçt / istifadəçi adı / ID)", message: "Mesajınız", start: "Göndər", type: "Mesaj yazın…", waiting: "Müraciətiniz qəbul edildi. Operator gözlənilir…", active: "Operator", closed: "Söhbət bağlandı", newChat: "Yeni söhbət", connecting: "Qoşulur…", offline: "Bağlantı bərpa olunur…", typing: "operator yazır…", image: "Şəkil", seen: "Oxundu", required: "Bütün xanaları doldurun", tooBig: "Şəkil çox böyükdür" },
+  en: { title: "Online Support", unavailable: "Live support is currently unavailable. Please try again later.", sub: "We usually reply in a few minutes", name: "Your name", account: "Account info (email / username / ID)", message: "Your message", start: "Send", type: "Type a message…", waiting: "Request received. Waiting for an operator…", active: "Operator", closed: "Chat closed", newChat: "New chat", connecting: "Connecting…", offline: "Reconnecting…", typing: "operator is typing…", image: "Image", seen: "Seen", required: "Please fill in all fields", tooBig: "Image is too large" },
+  ru: { title: "Онлайн поддержка", unavailable: "Онлайн поддержка сейчас недоступна. Попробуйте позже.", sub: "Обычно отвечаем за несколько минут", name: "Ваше имя", account: "Данные аккаунта (email / логин / ID)", message: "Ваше сообщение", start: "Отправить", type: "Напишите сообщение…", waiting: "Запрос принят. Ожидание оператора…", active: "Оператор", closed: "Чат закрыт", newChat: "Новый чат", connecting: "Подключение…", offline: "Восстановление связи…", typing: "оператор печатает…", image: "Фото", seen: "Прочитано", required: "Заполните все поля", tooBig: "Изображение слишком большое" },
+  tr: { title: "Canlı Destek", unavailable: "Canlı destek şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.", sub: "Genellikle birkaç dakikada yanıt veririz", name: "Adınız", account: "Hesap bilgisi (e-posta / kullanıcı adı / ID)", message: "Mesajınız", start: "Gönder", type: "Mesaj yazın…", waiting: "Talebiniz alındı. Operatör bekleniyor…", active: "Operatör", closed: "Sohbet kapandı", newChat: "Yeni sohbet", connecting: "Bağlanıyor…", offline: "Yeniden bağlanıyor…", typing: "operatör yazıyor…", image: "Resim", seen: "Okundu", required: "Tüm alanları doldurun", tooBig: "Resim çok büyük" },
 };
 
 function newSid() {
@@ -55,6 +76,8 @@ export default function LiveSupport() {
   const { user } = useAuth() || {};
   const L = DICT[(i18n.language || "az").slice(0, 2)] || DICT.en;
 
+  const [endpoint, setEndpoint] = useState(() => supportEndpoint(process.env.REACT_APP_LIVE_SUPPORT_URL));
+  const [configLoaded, setConfigLoaded] = useState(Boolean(endpoint));
   const [open, setOpen] = useState(false);
   const [conn, setConn] = useState("idle"); // idle | connecting | open | down
   const [session, setSession] = useState(undefined); // undefined = unknown, null = none
@@ -66,18 +89,33 @@ export default function LiveSupport() {
   const [image, setImage] = useState(null);
   const [lightbox, setLightbox] = useState(null);
   const [form, setForm] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(PROFILE_KEY)) || { name: "", account: "" }; } catch { return { name: "", account: "" }; }
+    try { return JSON.parse(readStored(PROFILE_KEY)) || { name: "", account: "" }; } catch { return { name: "", account: "" }; }
   });
   const [firstMsg, setFirstMsg] = useState("");
 
   const wsRef = useRef(null);
   const sidRef = useRef(null);
   const retryRef = useRef(0);
+  const retryTimer = useRef(null);
+  const connectionTimer = useRef(null);
   const openRef = useRef(open);
   const listRef = useRef(null);
   const typingTimer = useRef(null);
   const wantConn = useRef(false);
   openRef.current = open;
+
+  // Public runtime configuration lets static deployments configure chat without rebuilding.
+  useEffect(() => {
+    if (endpoint) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    fetch("/live-support-config.json", { cache: "no-store", signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((config) => { if (!controller.signal.aborted) setEndpoint(supportEndpoint(config?.url)); })
+      .catch(() => {})
+      .finally(() => { clearTimeout(timeout); setConfigLoaded(true); });
+    return () => { clearTimeout(timeout); controller.abort(); };
+  }, [endpoint]);
 
   // Prefill from logged-in user
   useEffect(() => {
@@ -95,18 +133,32 @@ export default function LiveSupport() {
   }, []);
 
   const connect = useCallback(() => {
-    if (!BASE) return;
+    if (!endpoint) return;
+    clearTimeout(retryTimer.current);
     if (wsRef.current && wsRef.current.readyState <= 1) return;
     if (!sidRef.current) {
-      sidRef.current = localStorage.getItem(SID_KEY) || newSid();
-      localStorage.setItem(SID_KEY, sidRef.current);
+      sidRef.current = readStored(SID_KEY) || newSid();
+      store(SID_KEY, sidRef.current);
     }
     wantConn.current = true;
     setConn("connecting");
-    const ws = new WebSocket(`${WS_URL}?role=visitor&sid=${encodeURIComponent(sidRef.current)}`);
+    let ws;
+    try { ws = new WebSocket(`${endpoint}?role=visitor&sid=${encodeURIComponent(sidRef.current)}`); }
+    catch {
+      setConn("down");
+      retryTimer.current = setTimeout(connect, 15000);
+      return;
+    }
     wsRef.current = ws;
-    ws.onopen = () => { retryRef.current = 0; setConn("open"); };
+    connectionTimer.current = setTimeout(() => { if (wsRef.current === ws) ws.close(); }, 20000);
+    ws.onopen = () => {
+      if (wsRef.current !== ws) return;
+      clearTimeout(connectionTimer.current);
+      retryRef.current = 0; setConn("open"); setErr("");
+    };
+    ws.onerror = () => { if (wsRef.current === ws) setConn("down"); };
     ws.onmessage = (e) => {
+      if (wsRef.current !== ws) return;
       let d; try { d = JSON.parse(e.data); } catch { return; }
       if (d.type === "state") setSession(d.session);
       else if (d.type === "msg") {
@@ -122,18 +174,22 @@ export default function LiveSupport() {
         setTyping(true); clearTimeout(typingTimer.current);
         typingTimer.current = setTimeout(() => setTyping(false), 2500);
       } else if (d.type === "read") setSeen(true);
+      else if (d.type === "error") setErr(d.error === "closed" ? L.closed : L.required);
     };
     ws.onclose = () => {
-      setConn("down");
+      if (wsRef.current !== ws) return;
+      clearTimeout(connectionTimer.current);
+      wsRef.current = null;
       if (!wantConn.current) return;
+      setConn("down");
       const delay = Math.min(15000, 1000 * 2 ** retryRef.current++);
-      setTimeout(connect, delay);
+      retryTimer.current = setTimeout(connect, delay);
     };
-  }, [send]);
+  }, [send, endpoint, L.closed, L.required]);
 
   // Resume an existing chat silently in the background (for unread badge)
   useEffect(() => {
-    if (BASE && localStorage.getItem(SID_KEY)) connect();
+    if (endpoint && readStored(SID_KEY)) connect();
     const onOpen = () => setOpen(true);
     window.addEventListener("open-live-support", onOpen);
     const ping = setInterval(() => send({ type: "ping" }), 20000);
@@ -141,9 +197,14 @@ export default function LiveSupport() {
       window.removeEventListener("open-live-support", onOpen);
       clearInterval(ping);
       wantConn.current = false;
-      wsRef.current?.close();
+      clearTimeout(retryTimer.current);
+      clearTimeout(connectionTimer.current);
+      clearTimeout(typingTimer.current);
+      const ws = wsRef.current;
+      wsRef.current = null;
+      ws?.close();
     };
-  }, [connect, send]);
+  }, [connect, send, endpoint]);
 
   useEffect(() => {
     if (open) { connect(); setUnread(0); send({ type: "read" }); }
@@ -153,7 +214,6 @@ export default function LiveSupport() {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [session?.messages?.length, typing, open]);
 
-  if (!BASE) return null;
 
   const pickImage = async (file) => {
     if (!file || !file.type.startsWith("image/")) return;
@@ -165,7 +225,7 @@ export default function LiveSupport() {
     e.preventDefault();
     const name = form.name.trim(), account = form.account.trim(), msg = firstMsg.trim();
     if (!name || !account || (!msg && !image)) { setErr(L.required); return; }
-    localStorage.setItem(PROFILE_KEY, JSON.stringify({ name, account }));
+    store(PROFILE_KEY, JSON.stringify({ name, account }));
     if (send({ type: "start", name, account, text: msg, image })) {
       setFirstMsg(""); setImage(null); setErr("");
     } else setErr(L.offline);
@@ -180,16 +240,22 @@ export default function LiveSupport() {
 
   const newChat = () => {
     wantConn.current = false;
-    wsRef.current?.close();
+    clearTimeout(retryTimer.current);
+    clearTimeout(connectionTimer.current);
+    const ws = wsRef.current;
+    wsRef.current = null;
+    ws?.close();
     sidRef.current = newSid();
-    localStorage.setItem(SID_KEY, sidRef.current);
-    setSession(null);
-    setTimeout(connect, 50);
+    store(SID_KEY, sidRef.current);
+    setSession(undefined); setUnread(0); setTyping(false); setSeen(false); setErr("");
+    setText(""); setFirstMsg(""); setImage(null);
+    connect();
   };
 
   const status = session?.status;
   const statusLine =
-    conn !== "open" ? (conn === "down" ? L.offline : L.connecting)
+    !endpoint && configLoaded ? L.unavailable
+      : conn !== "open" ? (conn === "down" ? L.offline : L.connecting)
       : status === "active" ? `${L.active}: ${session.operator || ""}`
       : status === "waiting" ? L.waiting
       : status === "closed" ? L.closed
@@ -202,13 +268,15 @@ export default function LiveSupport() {
     </div>
   ) : null;
 
-  return (
+  return createPortal(
     <>
       <button
         type="button"
         className={`ls-fab ${open ? "is-open" : ""}`}
         onClick={() => setOpen((o) => !o)}
         aria-label={L.title}
+        aria-expanded={open}
+        aria-controls="live-support-panel"
         data-testid="live-support-button"
       >
         {open ? (
@@ -223,7 +291,7 @@ export default function LiveSupport() {
       </button>
 
       {open && (
-        <div className="ls-panel" role="dialog" aria-label={L.title} data-testid="live-support-panel">
+        <div id="live-support-panel" className="ls-panel" role="dialog" aria-label={L.title} data-testid="live-support-panel">
           <header className="ls-head">
             <div className="ls-avatar">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 3a7 7 0 00-7 7v3a2 2 0 002 2h1v-6H7a5 5 0 0110 0h-1v6h1a2 2 0 002-2v-3a7 7 0 00-7-7z" fill="currentColor" /><path d="M16 17c0 1.5-1.8 3-4 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
@@ -238,7 +306,9 @@ export default function LiveSupport() {
             </button>
           </header>
 
-          {session === undefined && conn !== "down" ? (
+          {!endpoint && configLoaded ? (
+            <div className="ls-unavailable" role="status">{L.unavailable}</div>
+          ) : session === undefined && conn !== "down" ? (
             <div className="ls-center"><span className="ls-spinner" />{L.connecting}</div>
           ) : !session ? (
             <form className="ls-form" onSubmit={startChat}>
@@ -309,7 +379,8 @@ export default function LiveSupport() {
           <img src={lightbox} alt="" />
         </div>
       )}
-    </>
+    </>,
+    document.body
   );
 }
 
