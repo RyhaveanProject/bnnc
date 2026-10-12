@@ -14,6 +14,7 @@ import History from "./pages/History";
 import Support from "./pages/Support";
 import Admin from "./pages/Admin";
 import BinaryTrade from "./pages/BinaryTrade";
+import LiveSupport from "./components/LiveSupport";
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
@@ -71,6 +72,7 @@ function Shell() {
         <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <LiveSupport />
     </div>
   );
 }
