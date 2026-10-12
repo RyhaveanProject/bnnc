@@ -98,7 +98,7 @@ export default function LanguageSelector({ compact = false }) {
             top: "calc(100% + 6px)",
             right: 0,
             minWidth: 180,
-            background: "var(--panel, #161a20)",
+            background: "var(--panel, #1e2834)",
             border: "1px solid var(--border)",
             borderRadius: 10,
             boxShadow: "0 12px 30px rgba(0,0,0,0.45)",
@@ -121,7 +121,7 @@ export default function LanguageSelector({ compact = false }) {
                     alignItems: "center",
                     gap: 10,
                     width: "100%",
-                    background: active ? "rgba(240,185,11,0.10)" : "transparent",
+                    background: active ? "rgba(232,171,14,0.10)" : "transparent",
                     border: "none",
                     color: "var(--text)",
                     padding: "8px 10px",
@@ -142,7 +142,7 @@ export default function LanguageSelector({ compact = false }) {
                   </span>
                   {active && (
                     <span
-                      style={{ marginLeft: "auto", color: "var(--yellow, #f0b90b)" }}
+                      style={{ marginLeft: "auto", color: "var(--yellow, #e8ab0e)" }}
                       aria-hidden="true"
                     >
                       ✓

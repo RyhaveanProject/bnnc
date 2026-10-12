@@ -1,16 +1,21 @@
 /* Live support widget — uses the site palette from index.css */
 .ls-fab {
-  position: fixed; right: max(20px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom)); z-index: 2147483000;
+  /* Plain values FIRST: a browser that cannot parse max()/env() drops the whole
+     declaration, which left the launcher at its static position instead of the
+     bottom-right corner. The safe-area aware values below then refine it. */
+  position: fixed; right: 20px; bottom: 20px; z-index: 2147483647;
+  right: max(20px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom));
   display: inline-flex; align-items: center; gap: 8px;
   height: 54px; padding: 0 20px 0 16px; border: 0; border-radius: 28px;
   background: linear-gradient(135deg, var(--yellow-2), var(--yellow));
   color: #111; font-weight: 600; font-size: 14.5px; cursor: pointer;
-  box-shadow: 0 10px 30px rgba(240, 185, 11, .28), 0 2px 8px rgba(0, 0, 0, .4);
+  box-shadow: 0 10px 30px rgba(232, 171, 14, .28), 0 2px 8px rgba(0, 0, 0, .4);
   transition: transform .2s ease, box-shadow .2s ease, padding .2s ease;
 }
-.ls-fab:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(240, 185, 11, .38), 0 2px 8px rgba(0, 0, 0, .4); }
+.ls-fab:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(232, 171, 14, .38), 0 2px 8px rgba(0, 0, 0, .4); }
 .ls-fab.is-open { width: 54px; padding: 0; justify-content: center; }
 .ls-fab svg { flex: none; }
+.ls-fab, .ls-panel { will-change: auto; }
 .ls-badge {
   position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 6px;
   border-radius: 10px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700;
@@ -18,7 +23,8 @@
 }
 
 .ls-panel {
-  position: fixed; right: max(20px, env(safe-area-inset-right)); bottom: calc(88px + env(safe-area-inset-bottom)); z-index: 2147483001;
+  position: fixed; right: 20px; bottom: 88px; z-index: 2147483646;
+  right: max(20px, env(safe-area-inset-right)); bottom: calc(88px + env(safe-area-inset-bottom));
   width: min(370px, calc(100vw - 40px)); height: 560px; max-height: calc(100vh - 110px - env(safe-area-inset-bottom));
   max-height: calc(100dvh - 110px - env(safe-area-inset-bottom));
   display: flex; flex-direction: column; overflow: hidden;
@@ -36,7 +42,7 @@
 .ls-avatar {
   position: relative; width: 40px; height: 40px; border-radius: 50%; flex: none;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(240, 185, 11, .12); color: var(--yellow); border: 1px solid rgba(240, 185, 11, .35);
+  background: rgba(232, 171, 14, .12); color: var(--yellow); border: 1px solid rgba(232, 171, 14, .35);
 }
 .ls-dot { position: absolute; right: 0; bottom: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--text-dim); border: 2px solid var(--bg-2); }
 .ls-dot.on { background: var(--green); }
@@ -74,7 +80,7 @@
   display: flex !important; align-items: center; justify-content: center;
   background: var(--bg-3); border: 1px solid var(--border); color: var(--text-dim);
 }
-.ls-icon:hover { color: var(--yellow); border-color: rgba(240, 185, 11, .5); }
+.ls-icon:hover { color: var(--yellow); border-color: rgba(232, 171, 14, .5); }
 
 .ls-err { color: var(--red); font-size: 12.5px; }
 
@@ -114,10 +120,11 @@
 .ls-lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 10px; }
 
 @media (max-width: 520px) {
-  .ls-fab { right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); }
+  .ls-fab { right: 14px; bottom: 14px; right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); }
   .ls-fab:not(.is-open) .ls-fab-label { display: none; }
   .ls-fab:not(.is-open) { width: 54px; padding: 0; justify-content: center; }
-  .ls-panel { right: max(14px, env(safe-area-inset-right)); left: auto; bottom: calc(82px + env(safe-area-inset-bottom)); width: calc(100vw - 28px - env(safe-area-inset-right)); max-height: calc(100vh - 100px - env(safe-area-inset-bottom)); max-height: calc(100dvh - 100px - env(safe-area-inset-bottom)); }
+  .ls-panel { right: 14px; left: auto; bottom: 82px; width: calc(100vw - 28px); max-height: calc(100vh - 100px); position: fixed;
+    right: max(14px, env(safe-area-inset-right)); bottom: calc(82px + env(safe-area-inset-bottom)); width: calc(100vw - 28px - env(safe-area-inset-right)); max-height: calc(100vh - 100px - env(safe-area-inset-bottom)); max-height: calc(100dvh - 100px - env(safe-area-inset-bottom)); }
   .ls-form input, .ls-form textarea, .ls-compose textarea { font-size: 16px; }
 }
 

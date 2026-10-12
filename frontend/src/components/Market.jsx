@@ -34,7 +34,7 @@ export function useMarket(interval = 6000) {
   return { data, flash };
 }
 
-export function Sparkline({ points, color = "#0ecb81", width = 96, height = 32, responsive = false }) {
+export function Sparkline({ points, color = "#17a673", width = 96, height = 32, responsive = false }) {
   if (!points || points.length < 2) {
     return responsive
       ? <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }} />
@@ -100,7 +100,7 @@ export function MarketTable({ compact = false, onSelect }) {
                 {d.change24h >= 0 ? "+" : ""}{d.change24h.toFixed(2)}%
               </td>
               {!compact && <td className="hide-mobile">${fmtMoney(d.volume24h, 0)}</td>}
-              <td><Sparkline points={d.sparkline} color={d.change24h>=0?"#0ecb81":"#f6465d"} /></td>
+              <td><Sparkline points={d.sparkline} color={d.change24h>=0?"#17a673":"#eb5b59"} /></td>
               {onSelect && <td><button className="btn btn-primary btn-sm" data-testid={`trade-${d.symbol}-btn`} onClick={() => onSelect(d.symbol)}>{t("markets.trade_btn")}</button></td>}
             </tr>
           ))}
