@@ -9,6 +9,12 @@ services:
     rootDir: frontend
     buildCommand: yarn install && yarn build
     staticPublishPath: ./build
+    envVars:
+      - key: REACT_APP_LIVE_SUPPORT_URL
+        fromService:
+          type: web
+          name: adx-live-support
+          property: host
     routes:
       - type: rewrite
         source: /*
