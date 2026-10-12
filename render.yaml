@@ -17,3 +17,19 @@ services:
       - path: /*
         name: Cache-Control
         value: no-cache
+
+  # Live support (separate free web service). After deploy, put its URL into
+  # the frontend env as REACT_APP_LIVE_SUPPORT_URL.
+  - type: web
+    name: adx-live-support
+    runtime: node
+    plan: free
+    rootDir: live-support
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: OPERATOR_PASSWORD
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "*"
