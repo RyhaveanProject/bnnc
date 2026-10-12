@@ -2,22 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   ADX BRAND PALETTE
+   Extracted one-to-one from the live Abu Dhabi Securities Exchange
+   production stylesheet (adx.ae) — not approximated by hand:
+     --adx-navy-900  #0e1b2e   page background
+     --adx-navy-800  #1e2834   header / secondary surface
+     --adx-navy-700  #263241   raised surface, hover
+     --adx-navy-600  #1a2434   card / panel
+     --adx-slate-500 #2c3a4e   borders
+     --adx-slate-400 #8fa0b8   muted text
+     --adx-white     #f0f2f7   primary text
+     --adx-mist      #dce3ec   secondary text
+     --adx-gold-500  #e8ab0e   primary accent / CTA
+     --adx-gold-400  #f6c445   accent hover
+     --adx-gold-700  #b68300   deep accent
+     --adx-blue-900  #062f5f   institutional blue
+     --adx-blue-400  #5eb3e4   info / link blue
+     --adx-red-500   #eb5b59   negative
+     --adx-green-500 #17a673   positive
+   ============================================================ */
 :root {
-  --bg: #0b0e11;
-  --bg-2: #14181f;
-  --bg-3: #1c2129;
-  --panel: #181c23;
-  --border: #252b35;
-  --text: #eaecef;
-  --text-dim: #848e9c;
-  --yellow: #f0b90b;
-  --yellow-2: #fcd535;
-  --green: #0ecb81;
-  --red: #f6465d;
+  /* ---- ADX tokens ---- */
+  --adx-navy-900: #0e1b2e;
+  --adx-navy-800: #1e2834;
+  --adx-navy-700: #263241;
+  --adx-navy-600: #1a2434;
+  --adx-slate-500: #2c3a4e;
+  --adx-slate-400: #8fa0b8;
+  --adx-white: #f0f2f7;
+  --adx-mist: #dce3ec;
+  --adx-gold-500: #e8ab0e;
+  --adx-gold-400: #f6c445;
+  --adx-gold-700: #b68300;
+  --adx-blue-900: #062f5f;
+  --adx-blue-400: #5eb3e4;
+  --adx-red-500: #eb5b59;
+  --adx-green-500: #17a673;
+
+  /* ---- semantic aliases used across the app ---- */
+  --bg: var(--adx-navy-900);
+  --bg-2: var(--adx-navy-800);
+  --bg-3: var(--adx-navy-700);
+  --panel: var(--adx-navy-600);
+  --border: var(--adx-slate-500);
+  --text: var(--adx-white);
+  --text-dim: var(--adx-slate-400);
+  --yellow: var(--adx-gold-500);
+  --yellow-2: var(--adx-gold-400);
+  --green: var(--adx-green-500);
+  --red: var(--adx-red-500);
+  --blue: var(--adx-blue-900);
+  --blue-2: var(--adx-blue-400);
   /* Aliases used across pages (BinaryTrade, etc.) */
-  --color-green: #0ecb81;
-  --color-red: #f6465d;
-  --color-accent: #f0b90b;
+  --color-green: var(--adx-green-500);
+  --color-red: var(--adx-red-500);
+  --color-accent: var(--adx-gold-500);
 }
 
 * { box-sizing: border-box; }
@@ -46,16 +86,16 @@ button { font-family: inherit; }
 /* btn */
 .btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 18px; border-radius:8px; font-weight:600; cursor:pointer; transition: transform .08s ease, background .15s; border:none; }
 .btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--yellow); color:#0b0e11; }
+.btn-primary { background: var(--yellow); color:#0e1b2e; }
 .btn-primary:hover { background: var(--yellow-2); }
 .btn-ghost { background: transparent; color: var(--text); border:1px solid var(--border); }
 .btn-ghost:hover { background: var(--bg-3); }
-.btn-green { background: var(--green); color:#0b0e11; }
+.btn-green { background: var(--green); color:#0e1b2e; }
 .btn-red { background: var(--red); color:#fff; }
 .btn-sm { padding:6px 12px; font-size: 13px; }
 
 /* input */
-.input { width:100%; padding:12px 14px; background:#0b0e11; border:1px solid var(--border); color: var(--text); border-radius:8px; font-size:14px; outline:none; transition: border .15s; }
+.input { width:100%; padding:12px 14px; background:#0e1b2e; border:1px solid var(--border); color: var(--text); border-radius:8px; font-size:14px; outline:none; transition: border .15s; }
 .input:focus { border-color: var(--yellow); }
 
 label.lbl { display:block; font-size:13px; color: var(--text-dim); margin-bottom: 6px; }
@@ -76,8 +116,8 @@ label.lbl { display:block; font-size:13px; color: var(--text-dim); margin-bottom
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: rgba(240, 185, 11, 0.1);
-  border: 1px solid rgba(240, 185, 11, 0.3);
+  background: rgba(232, 171, 14, 0.1);
+  border: 1px solid rgba(232, 171, 14, 0.3);
   border-radius: 8px;
   font-weight: 600;
   white-space: nowrap;
@@ -140,8 +180,8 @@ label.lbl { display:block; font-size:13px; color: var(--text-dim); margin-bottom
 .ticker .sym { color: var(--text-dim); }
 
 /* flash */
-@keyframes flashG { 0% { background: rgba(14,203,129,.3);} 100%{ background: transparent;} }
-@keyframes flashR { 0% { background: rgba(246,70,93,.3);} 100%{ background: transparent;} }
+@keyframes flashG { 0% { background: rgba(23,166,115,.3);} 100%{ background: transparent;} }
+@keyframes flashR { 0% { background: rgba(235,91,89,.3);} 100%{ background: transparent;} }
 .flash-up { animation: flashG .8s ease; }
 .flash-down { animation: flashR .8s ease; }
 
@@ -149,7 +189,7 @@ label.lbl { display:block; font-size:13px; color: var(--text-dim); margin-bottom
 table.tbl { width:100%; border-collapse: collapse; font-size: 14px; }
 table.tbl th, table.tbl td { padding: 12px 16px; text-align: left; border-bottom:1px solid var(--border); }
 table.tbl th { color: var(--text-dim); font-weight: 500; font-size:12px; text-transform: uppercase; letter-spacing: .5px; }
-table.tbl tr:hover td { background: #1a1f27; }
+table.tbl tr:hover td { background: #263241; }
 
 /* responsive */
 .container-pad { padding: 24px; }
@@ -239,21 +279,21 @@ table.tbl tr:hover td { background: #1a1f27; }
 
 /* Vibrant gradient trading buttons (Buy Up / Buy Down) */
 .bt-buyup {
-  background: linear-gradient(135deg, #0ecb81 0%, #03a66d 100%) !important;
-  box-shadow: 0 4px 16px rgba(14, 203, 129, 0.35);
+  background: linear-gradient(135deg, #17a673 0%, #12855c 100%) !important;
+  box-shadow: 0 4px 16px rgba(23, 166, 115, 0.35);
 }
 .bt-buyup:hover:not(:disabled) {
-  background: linear-gradient(135deg, #14d68b 0%, #05b878 100%) !important;
-  box-shadow: 0 6px 22px rgba(14, 203, 129, 0.5);
+  background: linear-gradient(135deg, #1fbf85 0%, #17a673 100%) !important;
+  box-shadow: 0 6px 22px rgba(23, 166, 115, 0.5);
   transform: translateY(-1px);
 }
 .bt-buydown {
-  background: linear-gradient(135deg, #f6465d 0%, #d4314a 100%) !important;
-  box-shadow: 0 4px 16px rgba(246, 70, 93, 0.35);
+  background: linear-gradient(135deg, #eb5b59 0%, #c8424f 100%) !important;
+  box-shadow: 0 4px 16px rgba(235, 91, 89, 0.35);
 }
 .bt-buydown:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ff5c72 0%, #e63b58 100%) !important;
-  box-shadow: 0 6px 22px rgba(246, 70, 93, 0.5);
+  background: linear-gradient(135deg, #f07a76 0%, #c8424f 100%) !important;
+  box-shadow: 0 6px 22px rgba(235, 91, 89, 0.5);
   transform: translateY(-1px);
 }
 .bt-buyup:active:not(:disabled),
@@ -320,19 +360,19 @@ table.tbl tr:hover td { background: #1a1f27; }
 
 /* hero */
 .hero-bg { background:
-  radial-gradient(900px 600px at 20% 0%, rgba(240,185,11,.10), transparent 60%),
-  radial-gradient(700px 500px at 90% 30%, rgba(252,213,53,.05), transparent 60%),
-  #0b0e11;
+  radial-gradient(900px 600px at 20% 0%, rgba(232,171,14,.10), transparent 60%),
+  radial-gradient(700px 500px at 90% 30%, rgba(246,196,69,.05), transparent 60%),
+  #0e1b2e;
 }
 
 /* status pill */
 .pill { display:inline-flex; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; align-items:center; gap:6px; }
-.pill.pending { background: rgba(240,185,11,.12); color: var(--yellow); }
-.pill.approved, .pill.paid { background: rgba(14,203,129,.12); color: var(--green); }
-.pill.rejected { background: rgba(246,70,93,.12); color: var(--red); }
+.pill.pending { background: rgba(232,171,14,.12); color: var(--yellow); }
+.pill.approved, .pill.paid { background: rgba(23,166,115,.12); color: var(--green); }
+.pill.rejected { background: rgba(235,91,89,.12); color: var(--red); }
 
 /* spinner */
-.spinner { width:16px; height:16px; border:2px solid #2a2f3a; border-top-color: var(--yellow); border-radius:50%; animation: spin 0.9s linear infinite; display:inline-block; }
+.spinner { width:16px; height:16px; border:2px solid #2c3a4e; border-top-color: var(--yellow); border-radius:50%; animation: spin 0.9s linear infinite; display:inline-block; }
 @keyframes spin { to { transform: rotate(360deg);} }
 
 /* sparkline */
@@ -363,7 +403,7 @@ table.tbl tr:hover td { background: #1a1f27; }
   padding: 6px 14px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(240,185,11,.06);
+  background: rgba(232,171,14,.06);
   color: var(--text-dim);
   font-size: 12.5px;
   font-weight: 500;
@@ -492,7 +532,7 @@ table.tbl tr:hover td { background: #1a1f27; }
 .feature-ico {
   width: 44px; height: 44px;
   border-radius: 10px;
-  background: rgba(240,185,11,.10);
+  background: rgba(232,171,14,.10);
   color: var(--yellow);
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 20px; font-weight: 700;
@@ -510,7 +550,7 @@ table.tbl tr:hover td { background: #1a1f27; }
   justify-content: space-between;
   gap: 32px;
   background:
-    radial-gradient(500px 240px at 0% 0%, rgba(240,185,11,.08), transparent 60%),
+    radial-gradient(500px 240px at 0% 0%, rgba(232,171,14,.08), transparent 60%),
     var(--panel);
 }
 .cta-title {
@@ -714,3 +754,9 @@ html, body, #root { max-width: 100%; overflow-x: hidden; }
   }
 }
 
+
+/* =====================================================
+   ADX LIVE SUPPORT — launcher must always sit bottom-right
+   ===================================================== */
+.ls-fab, .ls-panel { position: fixed !important; }
+.ls-fab { pointer-events: auto; }
