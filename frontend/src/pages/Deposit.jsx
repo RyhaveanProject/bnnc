@@ -35,7 +35,7 @@ function Countdown({ deadline, onExpire }) {
   return (
     <div
       data-testid="dep-countdown"
-      style={{ fontWeight: 700, fontSize: 18, color: danger ? "#ff6b6b" : "var(--text)", fontVariantNumeric: "tabular-nums" }}
+      style={{ fontWeight: 700, fontSize: 18, color: danger ? "#f07a76" : "var(--text)", fontVariantNumeric: "tabular-nums" }}
     >
       {m}:{s}
     </div>
@@ -215,7 +215,7 @@ export default function Deposit() {
 
               <label className="lbl" style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {t("deposit.upload_screenshot")}
-                <span style={{ color: "#ff6b6b", fontWeight: 700 }} aria-hidden="true">*</span>
+                <span style={{ color: "#f07a76", fontWeight: 700 }} aria-hidden="true">*</span>
                 <span style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 400 }}>{t("deposit.required")}</span>
               </label>
               <input ref={fileInputRef} type="file"

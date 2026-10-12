@@ -66,7 +66,7 @@ export default function Dashboard() {
         <div>
           <div className="label-eyebrow mb-1">Live markets</div>
           <h2 className="font-display text-2xl font-semibold flex items-center gap-2">
-            <Activity className="w-5 h-5 text-[#007AFF]" /> Watchlist
+            <Activity className="w-5 h-5 text-[#5eb3e4]" /> Watchlist
           </h2>
         </div>
         <span className="text-xs text-slate-500 font-mono">auto-refresh 15s</span>
@@ -91,7 +91,7 @@ export default function Dashboard() {
                 {fmt.pct(m.change_24h)} <span className="text-slate-600 ml-1">24h</span>
               </div>
               <div className="mt-3 -mx-1"><Sparkline data={m.sparkline} up={up} height={48} /></div>
-              <div className="mt-3 pt-3 border-t border-[#1E293B] grid grid-cols-2 gap-2 text-xs">
+              <div className="mt-3 pt-3 border-t border-[#263241] grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <div className="text-slate-500">Market cap</div>
                   <div className="font-mono text-slate-300">{fmt.big(m.market_cap)}</div>

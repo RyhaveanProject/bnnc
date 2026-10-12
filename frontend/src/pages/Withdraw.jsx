@@ -65,7 +65,7 @@ export default function Withdraw() {
           <input className="input" type="number" step="any" min="0" max={bal} value={amount} onChange={e=>setAmount(e.target.value)} required data-testid="wd-amount"/>
           <button type="button" className="btn btn-ghost btn-sm" style={{marginTop:8}} onClick={()=>setAmount(String(bal))} data-testid="wd-max">{t("withdraw.max")}</button>
 
-          <div className="panel" style={{padding:14, marginTop:16, background:"#0f1319"}}>
+          <div className="panel" style={{padding:14, marginTop:16, background:"#0e1b2e"}}>
             <Row label={t("withdraw.network_fee")} value={`${fee} ${currency}`} />
             <Row label={t("withdraw.you_receive")} value={`${net.toFixed(6)} ${currency}`} bold />
           </div>

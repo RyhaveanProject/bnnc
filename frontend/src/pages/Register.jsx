@@ -205,12 +205,12 @@ export default function Register() {
               gap: 10,
               padding: "10px 12px",
               margin: "0 0 16px",
-              background: "rgba(240, 185, 11, 0.08)",
-              border: "1px solid rgba(240, 185, 11, 0.35)",
+              background: "rgba(232, 171, 14, 0.08)",
+              border: "1px solid rgba(232, 171, 14, 0.35)",
               borderRadius: 8,
               fontSize: 12.5,
               lineHeight: 1.5,
-              color: "#eaecef",
+              color: "#f0f2f7",
             }}
           >
             <span aria-hidden="true" style={{ color: "var(--yellow)", fontSize: 16, lineHeight: 1, flexShrink: 0 }}>!</span>

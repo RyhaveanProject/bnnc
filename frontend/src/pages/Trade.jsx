@@ -86,7 +86,7 @@ export default function Trade() {
           <div style={{fontWeight:600, padding:"6px 8px"}}>{t("trade.pairs")}</div>
           {data.filter(d => d.symbol !== "USDT").map(d => (
             <button key={d.symbol} onClick={() => onSym(d.symbol)} data-testid={`pair-${d.symbol}`}
-              style={{display:"flex", justifyContent:"space-between", width:"100%", padding:"10px 8px", background: d.symbol===symbol?"#1c2129":"transparent", border:"none", color:"var(--text)", cursor:"pointer", borderRadius:6, fontSize:14}}>
+              style={{display:"flex", justifyContent:"space-between", width:"100%", padding:"10px 8px", background: d.symbol===symbol?"#263241":"transparent", border:"none", color:"var(--text)", cursor:"pointer", borderRadius:6, fontSize:14}}>
               <span>{d.symbol}/USDT</span>
               <span className={d.change24h>=0?"text-green":"text-red"}>{d.change24h.toFixed(2)}%</span>
             </button>
@@ -102,7 +102,7 @@ export default function Trade() {
             </div>
           </div>
           <div style={{marginTop:16, padding:"16px 0", height:200}}>
-            {coin && <Sparkline points={coin.sparkline} width={600} height={200} color={coin.change24h>=0?"#0ecb81":"#f6465d"} responsive />}
+            {coin && <Sparkline points={coin.sparkline} width={600} height={200} color={coin.change24h>=0?"#17a673":"#eb5b59"} responsive />}
           </div>
           <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, marginTop:8}}>
             <Stat label={t("trade.stat_24h_volume")} value={`$${fmtMoney(coin?.volume24h ?? 0, 0)}`} />

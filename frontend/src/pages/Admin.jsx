@@ -236,9 +236,9 @@ function OnlineStatus() {
                   <td><strong>{fmtMoney(trader.amount_usd, 2)} USDT</strong></td>
                   <td>
                     {trader.direction === "rise" ? (
-                      <span style={{ color: "#10b981" }}>📈 Rise</span>
+                      <span style={{ color: "#17a673" }}>📈 Rise</span>
                     ) : (
-                      <span style={{ color: "#ef4444" }}>📉 Fall</span>
+                      <span style={{ color: "#eb5b59" }}>📉 Fall</span>
                     )}
                   </td>
                   <td>{fmtMoney(trader.entry_price, 2)}</td>
@@ -523,7 +523,7 @@ function Wallets() {
         const w = rows.find((x) => x.currency === c) || { currency: c, address: "", network: c, qr_image_b64: "" };
         const isEditing = editing === c;
         return (
-          <div key={c} className="panel" style={{ padding: 16, marginBottom: 12, background: "#0f1319" }}>
+          <div key={c} className="panel" style={{ padding: 16, marginBottom: 12, background: "#0e1b2e" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={{ fontWeight: 700, fontSize: 18 }}>{c}</div>
               {!isEditing && (

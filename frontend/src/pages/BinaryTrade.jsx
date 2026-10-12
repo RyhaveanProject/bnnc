@@ -211,7 +211,7 @@ export default function BinaryTrade() {
       </div>
 
       {user && !user.trading_enabled && (
-        <div style={{ padding: 12, marginBottom: 16, background: "rgba(246,70,93,0.08)", border: "1px solid rgba(246,70,93,0.2)", borderRadius: 10, fontSize: 13, color: "var(--color-red)" }}>
+        <div style={{ padding: 12, marginBottom: 16, background: "rgba(235,91,89,0.08)", border: "1px solid rgba(235,91,89,0.2)", borderRadius: 10, fontSize: 13, color: "var(--color-red)" }}>
           <strong>Trading is risky — if you don’t take risks, you can’t make profits.</strong>
         </div>
       )}
@@ -235,9 +235,9 @@ export default function BinaryTrade() {
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "12px 14px",
-                    background: active ? "rgba(240,185,11,0.08)" : "transparent",
+                    background: active ? "rgba(232,171,14,0.08)" : "transparent",
                     border: "1px solid",
-                    borderColor: active ? "rgba(240,185,11,0.4)" : "transparent",
+                    borderColor: active ? "rgba(232,171,14,0.4)" : "transparent",
                     borderRadius: 8,
                     cursor: "pointer",
                     color: "inherit",
@@ -280,7 +280,7 @@ export default function BinaryTrade() {
 
           {/* Active trade overlay */}
           {activeTrade && (
-            <div style={{ marginBottom: 20, padding: 16, borderRadius: 10, background: "rgba(240,185,11,0.06)", border: "1px solid rgba(240,185,11,0.25)" }} data-testid="bt-active">
+            <div style={{ marginBottom: 20, padding: 16, borderRadius: 10, background: "rgba(232,171,14,0.06)", border: "1px solid rgba(232,171,14,0.25)" }} data-testid="bt-active">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                 <div>
                   <div className="text-dim" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>Active Trade</div>
@@ -306,7 +306,7 @@ export default function BinaryTrade() {
           )}
 
           {lastResult && !activeTrade && (
-            <div style={{ marginBottom: 20, padding: 14, borderRadius: 10, background: lastResult.win ? "rgba(3,166,109,0.1)" : "rgba(246,70,93,0.08)", border: `1px solid ${lastResult.win ? "rgba(3,166,109,0.3)" : "rgba(246,70,93,0.25)"}` }} data-testid="bt-last-result">
+            <div style={{ marginBottom: 20, padding: 14, borderRadius: 10, background: lastResult.win ? "rgba(3,166,109,0.1)" : "rgba(235,91,89,0.08)", border: `1px solid ${lastResult.win ? "rgba(3,166,109,0.3)" : "rgba(235,91,89,0.25)"}` }} data-testid="bt-last-result">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 16, color: lastResult.win ? "var(--color-green)" : "var(--color-red)" }}>
@@ -341,7 +341,7 @@ export default function BinaryTrade() {
                     border: "1px solid",
                     borderColor: active ? "var(--color-accent)" : "var(--border)",
                     background: active ? "var(--color-accent)" : "transparent",
-                    color: active ? "#0b0e11" : "inherit",
+                    color: active ? "#0e1b2e" : "inherit",
                     fontWeight: 700,
                     fontSize: 15,
                     cursor: disabled || activeTrade ? "not-allowed" : "pointer",
@@ -400,7 +400,7 @@ export default function BinaryTrade() {
                     border: "1px solid",
                     borderColor: active ? "var(--color-accent)" : "var(--border)",
                     background: active ? "var(--color-accent)" : "transparent",
-                    color: active ? "#0b0e11" : "inherit",
+                    color: active ? "#0e1b2e" : "inherit",
                     cursor: activeTrade || locked ? "not-allowed" : "pointer",
                     opacity: locked ? 0.4 : 1,
                     transition: "all 0.15s",

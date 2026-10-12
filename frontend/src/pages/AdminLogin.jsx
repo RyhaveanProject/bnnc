@@ -31,13 +31,13 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0B0F19] text-white p-6">
+    <div className="min-h-screen flex items-center justify-center bg-[#0e1b2e] text-white p-6">
       <div className="w-full max-w-sm">
         <Link to="/" className="text-slate-500 hover:text-white text-sm inline-flex items-center gap-1 mb-8"><ArrowLeft className="w-3.5 h-3.5" /> Back to site</Link>
         <div className="card-flat p-8">
           <div className="flex items-center gap-3 mb-7">
-            <div className="w-10 h-10 bg-[#1A233A] border border-[#334155] flex items-center justify-center rounded-sm">
-              <Shield className="w-5 h-5 text-[#F59E0B]" />
+            <div className="w-10 h-10 bg-[#1e2834] border border-[#2c3a4e] flex items-center justify-center rounded-sm">
+              <Shield className="w-5 h-5 text-[#e8ab0e]" />
             </div>
             <div>
               <div className="font-display text-xl font-semibold">Administrator</div>
