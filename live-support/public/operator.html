@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="az">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ADX · Operator Paneli</title>
+<style>
+  :root{--bg:#0b0e11;--bg2:#14181f;--bg3:#1c2129;--panel:#181c23;--border:#252b35;--text:#eaecef;--dim:#848e9c;--y:#f0b90b;--g:#0ecb81;--r:#f6465d}
+  *{box-sizing:border-box}html,body{height:100%;margin:0}
+  body{font-family:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  button{font-family:inherit;cursor:pointer}
+  .login{display:flex;align-items:center;justify-content:center;height:100%}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:28px;width:340px}
+  .card h1{margin:0 0 4px;font-size:20px}.card p{margin:0 0 20px;color:var(--dim);font-size:13px}
+  input,textarea{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 12px;font:inherit;font-size:14px;outline:none}
+  input:focus,textarea:focus{border-color:var(--y)}
+  label{display:block;font-size:12px;color:var(--dim);margin:12px 0 6px}
+  .btn{background:var(--y);color:#111;border:0;border-radius:8px;padding:11px 16px;font-weight:600;font-size:14px}
+  .btn:hover{background:#fcd535}.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+  .btn.danger{background:transparent;color:var(--r);border:1px solid var(--r)}
+  .err{color:var(--r);font-size:13px;margin-top:10px;min-height:16px}
+  .app{display:none;height:100%;grid-template-columns:330px 1fr}
+  .side{border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg2);min-height:0}
+  .side header{padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .brand{font-weight:700}.brand span{color:var(--y)}
+  .conn{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--r);display:inline-block}.dot.on{background:var(--g)}
+  .tabs{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border)}
+  .tab{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--dim);border-radius:7px;padding:7px;font-size:12px}
+  .tab.on{color:#111;background:var(--y);border-color:var(--y);font-weight:600}
+  .list{overflow:auto;flex:1}
+  .item{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;gap:10px}
+  .item:hover{background:var(--bg3)}.item.on{background:var(--bg3);box-shadow:inset 3px 0 0 var(--y)}
+  .av{width:38px;height:38px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--y);flex:none;position:relative}
+  .av .dot{position:absolute;right:-1px;bottom:-1px;border:2px solid var(--bg2)}
+  .meta{flex:1;min-width:0}.row{display:flex;justify-content:space-between;gap:8px}
+  .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tm{font-size:11px;color:var(--dim);flex:none}
+  .pv{font-size:12.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+  .badge{background:var(--y);color:#111;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px}
+  .st{font-size:10.5px;padding:1px 7px;border-radius:10px;border:1px solid var(--border);color:var(--dim)}
+  .st.waiting{color:var(--y);border-color:var(--y)}.st.active{color:var(--g);border-color:var(--g)}
+  .main{display:flex;flex-direction:column;min-height:0}
+  .empty{margin:auto;color:var(--dim);text-align:center}
+  .ch{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--bg2)}
+  .ch .sub{font-size:12.5px;color:var(--dim);margin-top:2px}
+  .acts{display:flex;gap:8px}
+  .msgs{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:8px}
+  .m{max-width:68%;padding:9px 12px;border-radius:12px;font-size:14px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}
+  .m.visitor{background:var(--bg3);border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:4px}
+  .m.operator{background:var(--y);color:#111;align-self:flex-end;border-bottom-right-radius:4px}
+  .m.system{align-self:center;background:transparent;color:var(--dim);font-size:12px;padding:2px}
+  .m img{display:block;max-width:100%;max-height:280px;border-radius:8px;margin-bottom:4px;cursor:zoom-in}
+  .m .t{font-size:10.5px;opacity:.65;margin-top:3px;text-align:right}
+  .comp{border-top:1px solid var(--border);padding:12px;display:flex;gap:8px;align-items:flex-end;background:var(--bg2)}
+  .comp textarea{resize:none;height:44px;max-height:140px}
+  .icon{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex:none}
+  .prev{padding:8px 12px 0;display:none;background:var(--bg2)}.prev img{height:70px;border-radius:6px;border:1px solid var(--border)}
+  .acc{padding:14px 20px;background:rgba(240,185,11,.08);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:14px}
+  .typing{font-size:12px;color:var(--dim);padding:0 20px 6px;height:18px}
+  .lb{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:9}.lb img{max-width:92vw;max-height:92vh;border-radius:8px}
+  @media (max-width:760px){.app{grid-template-columns:1fr}.side{display:var(--sd,flex)}.main{display:var(--md,none)}.back{display:inline-flex!important}}
+  .back{display:none}
+</style>
+</head>
+<body>
+<div class="login" id="login">
+  <form class="card" id="loginForm">
+    <h1>Operator Paneli</h1>
+    <p>ADX DUBAI · Canlı dəstək</p>
+    <label>Adınız</label><input id="opName" required maxlength="40" placeholder="" />
+    <label>Şifrə</label><input id="opPass" type="password" required />
+    <button class="btn" style="width:100%;margin-top:18px">Daxil ol</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</div>
+
+<div class="app" id="app">
+  <aside class="side">
+    <header><div class="brand">ADX <span>Support</span></div><div class="conn"><span class="dot" id="connDot"></span><span id="connTxt">Qoşulur…</span></div></header>
+    <div class="tabs">
+      <button class="tab on" data-f="open">Açıq</button>
+      <button class="tab" data-f="waiting">Gözləyən</button>
+      <button class="tab" data-f="closed">Bağlı</button>
+    </div>
+    <div class="list" id="list"></div>
+  </aside>
+  <section class="main" id="main"><div class="empty">Söhbət seçin</div></section>
+</div>
+<div class="lb" id="lb" onclick="this.style.display='none'"><img id="lbImg" alt="" /></div>
+
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const sessions = new Map(); const histories = new Map();
+  let ws, current = null, filter = "open", creds = null, retry = 0, pendingImg = null, typingTimer;
+
+  const saved = JSON.parse(localStorage.getItem("ls_op") || "null");
+  if (saved) { $("opName").value = saved.name; $("opPass").value = saved.pass; }
+  $("loginForm").onsubmit = (e) => { e.preventDefault(); creds = { name: $("opName").value.trim(), pass: $("opPass").value }; connect(true); };
+  if (saved) { creds = saved; connect(true); }
+  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+
+  function connect(first){
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${proto}://${location.host}/ws?role=operator&token=${encodeURIComponent(creds.pass)}&name=${encodeURIComponent(creds.name)}`);
+    let opened = false;
+    ws.onopen = () => { opened = true; retry = 0; localStorage.setItem("ls_op", JSON.stringify(creds));
+      $("login").style.display = "none"; $("app").style.display = "grid"; setConn(true);
+      if (current) send({ type: "open", sid: current }); };
+    ws.onmessage = (e) => handle(JSON.parse(e.data));
+    ws.onclose = () => { setConn(false);
+      if (!opened && first && $("app").style.display !== "grid") { $("loginErr").textContent = "Şifrə yanlışdır."; localStorage.removeItem("ls_op"); return; }
+      setTimeout(() => connect(false), Math.min(10000, 1000 * ++retry)); };
+  }
+  setInterval(() => send({ type: "ping" }), 20000);
+  function send(o){ if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+  function setConn(on){ $("connDot").className = "dot" + (on ? " on" : ""); $("connTxt").textContent = on ? "Onlayn" : "Bağlantı yoxdur"; }
+
+  function handle(d){
+    if (d.type === "sessions") { sessions.clear(); d.sessions.forEach((s) => sessions.set(s.id, s)); renderList(); }
+    else if (d.type === "session") { sessions.set(d.session.id, d.session); renderList(); if (d.session.id === current) renderHeader(); }
+    else if (d.type === "new_session") { sessions.set(d.session.id, d.session); renderList(); notify("Yeni müraciət", d.session.name + ": " + (d.session.last?.text || "📷 Şəkil")); }
+    else if (d.type === "history") { histories.set(d.sid, d.messages); sessions.set(d.sid, d.session); if (d.sid === current) renderChat(); }
+    else if (d.type === "msg") {
+      if (histories.has(d.sid)) histories.get(d.sid).push(d.message);
+      if (d.sid === current) { appendMsg(d.message); if (d.message.from === "visitor" && document.hasFocus()) send({ type: "read", sid: current }); }
+      if (d.message.from === "visitor" && (d.sid !== current || !document.hasFocus())) notify(sessions.get(d.sid)?.name || "Mesaj", d.message.text || "📷 Şəkil");
+    }
+    else if (d.type === "typing" && d.sid === current) { const t = document.querySelector(".typing"); if (t) { t.textContent = "yazır…"; clearTimeout(typingTimer); typingTimer = setTimeout(() => t.textContent = "", 2500); } }
+    else if (d.type === "deleted") { sessions.delete(d.sid); histories.delete(d.sid); if (current === d.sid) { current = null; $("main").innerHTML = '<div class="empty">Söhbət seçin</div>'; } renderList(); }
+  }
+
+  let audioCtx;
+  function beep(){ try { audioCtx = audioCtx || new AudioContext(); const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.frequency.value = 880; g.gain.value = .08; o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + .18); } catch(_){} }
+  function notify(title, body){ beep(); document.title = "● " + title; if ("Notification" in window && Notification.permission === "granted" && !document.hasFocus()) new Notification(title, { body }); }
+  window.addEventListener("focus", () => { document.title = "ADX · Operator Paneli"; if (current) send({ type: "read", sid: current }); });
+
+  document.querySelectorAll(".tab").forEach((b) => b.onclick = () => { document.querySelectorAll(".tab").forEach((x) => x.classList.remove("on")); b.classList.add("on"); filter = b.dataset.f; renderList(); });
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const fmt = (t) => { const d = new Date(t), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }) : d.toLocaleDateString(); };
+  const stTxt = { waiting: "Gözləyir", active: "Aktiv", closed: "Bağlı" };
+
+  function renderList(){
+    const arr = [...sessions.values()].filter((s) => filter === "open" ? s.status !== "closed" : s.status === filter).sort((a, b) => b.updatedAt - a.updatedAt);
+    $("list").innerHTML = arr.length ? arr.map((s) => `
+      <div class="item ${s.id === current ? "on" : ""}" data-id="${s.id}">
+        <div class="av">${esc(s.name[0]?.toUpperCase())}<span class="dot ${s.online ? "on" : ""}"></span></div>
+        <div class="meta">
+          <div class="row"><div class="nm">${esc(s.name)}</div><div class="tm">${fmt(s.updatedAt)}</div></div>
+          <div class="row" style="margin-top:3px"><span class="st ${s.status}">${stTxt[s.status]}</span>${s.unread ? `<span class="badge">${s.unread}</span>` : ""}</div>
+          <div class="pv">${s.last ? (s.last.from === "operator" ? "Siz: " : "") + (s.last.image && !s.last.text ? "📷 Şəkil" : esc(s.last.text)) : ""}</div>
+        </div>
+      </div>`).join("") : '<div class="empty" style="padding:30px">Söhbət yoxdur</div>';
+    $("list").querySelectorAll(".item").forEach((el) => el.onclick = () => openChat(el.dataset.id));
+  }
+
+  function openChat(id){
+    current = id; renderList();
+    document.documentElement.style.setProperty("--sd", "none"); document.documentElement.style.setProperty("--md", "flex");
+    $("main").innerHTML = '<div class="empty">Yüklənir…</div>';
+    send({ type: "open", sid: id }); send({ type: "read", sid: id });
+  }
+
+  function renderHeader(){
+    const s = sessions.get(current); if (!s) return;
+    const h = document.querySelector(".ch"); if (!h) return;
+    h.querySelector(".nmx").textContent = s.name;
+    h.querySelector(".sub").innerHTML = `${esc(s.account)} · <span class="st ${s.status}">${stTxt[s.status]}</span>${s.operator ? " · " + esc(s.operator) : ""}`;
+    const acc = document.querySelector(".acc"); if (acc) acc.style.display = s.status === "waiting" ? "flex" : "none";
+    const comp = document.querySelector(".comp"); if (comp) comp.style.display = s.status === "closed" ? "none" : "flex";
+    const cl = $("closeBtn"); if (cl) cl.style.display = s.status === "closed" ? "none" : "";
+  }
+
+  function renderChat(){
+    const s = sessions.get(current); if (!s) return;
+    $("main").innerHTML = `
+      <div class="ch">
+        <div style="display:flex;gap:10px;align-items:center;min-width:0">
+          <button class="icon back" id="backBtn">←</button>
+          <div style="min-width:0"><div class="nmx" style="font-weight:600"></div><div class="sub"></div></div>
+        </div>
+        <div class="acts"><button class="btn danger" id="closeBtn">Bağla</button><button class="btn ghost" id="delBtn" title="Sil">🗑</button></div>
+      </div>
+      <div class="acc"><span>Bu istifadəçi operator gözləyir.</span><button class="btn" id="accBtn">Qəbul et</button></div>
+      <div class="msgs" id="msgs"></div>
+      <div class="typing"></div>
+      <div class="prev" id="prev"><img id="prevImg" alt="" /> <button class="btn ghost" id="prevX" style="padding:4px 10px;vertical-align:top">✕</button></div>
+      <div class="comp">
+        <label class="icon" title="Şəkil" style="margin:0;cursor:pointer">📎<input type="file" accept="image/*" id="file" hidden /></label>
+        <textarea id="txt" placeholder="Mesaj yazın…"></textarea>
+        <button class="btn" id="sendBtn" style="height:44px">Göndər</button>
+      </div>`;
+    renderHeader();
+    (histories.get(current) || []).forEach(appendMsg);
+    $("backBtn").onclick = () => { current = null; document.documentElement.style.setProperty("--sd", "flex"); document.documentElement.style.setProperty("--md", "none"); renderList(); };
+    $("accBtn").onclick = () => send({ type: "accept", sid: current });
+    $("closeBtn").onclick = () => confirm("Söhbəti bağlamaq?") && send({ type: "close", sid: current });
+    $("delBtn").onclick = () => confirm("Söhbəti tamamilə silmək?") && send({ type: "delete", sid: current });
+    $("file").onchange = async (e) => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; pendingImg = await compress(f); $("prevImg").src = pendingImg; $("prev").style.display = "block"; };
+    $("prevX").onclick = () => { pendingImg = null; $("prev").style.display = "none"; };
+    const doSend = () => { const text = $("txt").value.trim(); if (!text && !pendingImg) return;
+      send({ type: "msg", sid: current, text, image: pendingImg }); $("txt").value = ""; pendingImg = null; $("prev").style.display = "none"; };
+    $("sendBtn").onclick = doSend;
+    $("txt").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } else send({ type: "typing", sid: current }); };
+    $("txt").addEventListener("paste", async (e) => { const it = [...e.clipboardData.items].find((i) => i.type.startsWith("image/")); if (it) { pendingImg = await compress(it.getAsFile()); $("prevImg").src = pendingImg; $("prev").style.display = "block"; } });
+  }
+
+  function appendMsg(m){
+    const box = $("msgs"); if (!box) return;
+    const el = document.createElement("div"); el.className = "m " + m.from;
+    if (m.from === "system") el.textContent = m.text;
+    else el.innerHTML = (m.image ? `<img src="${m.image}" alt="" />` : "") + (m.text ? esc(m.text) : "") + `<div class="t">${fmt(m.at)}</div>`;
+    const img = el.querySelector("img"); if (img) img.onclick = () => { $("lbImg").src = m.image; $("lb").style.display = "flex"; };
+    box.appendChild(el); box.scrollTop = box.scrollHeight;
+  }
+
+  function compress(file){ return new Promise((res) => { const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => {
+    const max = 1400, sc = Math.min(1, max / Math.max(im.width, im.height)); const c = document.createElement("canvas");
+    c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+    res(c.toDataURL("image/jpeg", .85)); }; im.src = r.result; }; r.readAsDataURL(file); }); }
+})();
+</script>
+</body>
+</html>
